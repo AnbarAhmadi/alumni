@@ -32,6 +32,7 @@ This Web Programming implementation carries that analysis and design forward int
 
 Features have will be defined and added as the course progresses.
 
+---
 ## 🛠️ Tech Stack
 
 | Category | Technology |
