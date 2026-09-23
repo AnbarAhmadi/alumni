@@ -1,9 +1,12 @@
+import Link from "next/link";
+
 const categories = [
   {
     id: "about",
     icon: "🎓",
     title: "About",
     text: "Learn what the Alumni Tracking System is and why we built it.",
+    href: "/about",
   },
   {
     id: "alumni",
@@ -66,14 +69,23 @@ export default function Home() {
       <main className="container">
         <h2 className="section-title">Explore</h2>
         <div className="grid">
-          {categories.map((c) => (
-            <div key={c.id} id={c.id} className="card">
-              <div className="icon">{c.icon}</div>
-              <h3>{c.title}</h3>
-              <p>{c.text}</p>
-              <span className="badge">Coming soon</span>
-            </div>
-          ))}
+          {categories.map((c) =>
+            c.href ? (
+              <Link key={c.id} id={c.id} href={c.href} className="card card-link">
+                <div className="icon">{c.icon}</div>
+                <h3>{c.title}</h3>
+                <p>{c.text}</p>
+                <span className="badge live">Open →</span>
+              </Link>
+            ) : (
+              <div key={c.id} id={c.id} className="card">
+                <div className="icon">{c.icon}</div>
+                <h3>{c.title}</h3>
+                <p>{c.text}</p>
+                <span className="badge">Coming soon</span>
+              </div>
+            ),
+          )}
         </div>
       </main>
     </>
