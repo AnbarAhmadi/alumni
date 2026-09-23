@@ -1,0 +1,161 @@
+:root {
+  --navy: #0b2545;
+  --navy-light: #13315c;
+  --gold: #e0a526;
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --text: #1c2536;
+  --muted: #5b6678;
+  --border: #dde3ee;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+a {
+  color: inherit;
+}
+
+/* Header */
+.site-header {
+  background: var(--navy);
+  color: #fff;
+  border-bottom: 4px solid var(--gold);
+}
+
+.site-header .inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 1.15rem;
+  text-decoration: none;
+}
+
+.logo span {
+  color: var(--gold);
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.nav a {
+  text-decoration: none;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  opacity: 0.9;
+}
+
+.nav a:hover {
+  background: var(--navy-light);
+  opacity: 1;
+}
+
+/* Hero */
+.hero {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 60%, #1d4e89 100%);
+  color: #fff;
+  padding: 4rem 1rem 4.5rem;
+  text-align: center;
+}
+
+.hero h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+}
+
+.hero .subtitle {
+  margin: 0 0 1rem;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.hero p {
+  max-width: 640px;
+  margin: 0 auto;
+  opacity: 0.9;
+}
+
+/* Main content */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+}
+
+.section-title {
+  margin: 0 0 1.5rem;
+  font-size: 1.5rem;
+  color: var(--navy);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+.card {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--gold);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.card .icon {
+  font-size: 1.8rem;
+}
+
+.card h3 {
+  margin: 0.5rem 0 0.35rem;
+  color: var(--navy);
+}
+
+.card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.badge {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: #eef1f7;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Footer */
+.site-footer {
+  background: var(--navy);
+  color: #c9d3e3;
+  text-align: center;
+  padding: 1.5rem 1rem;
+  font-size: 0.9rem;
+}
