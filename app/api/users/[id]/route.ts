@@ -51,3 +51,13 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   users[index] = { ...users[index], ...fields.data };
   return Response.json(users[index]);
 }
+
+// Removes the user and returns the user that was deleted.
+export async function DELETE(_req: NextRequest, ctx: Ctx) {
+  const { id } = await ctx.params;
+  const index = findIndex(id);
+  if (index === -1) return notFound(id);
+
+  const [deleted] = users.splice(index, 1);
+  return Response.json(deleted);
+}
