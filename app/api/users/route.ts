@@ -7,6 +7,10 @@ type User = {
 // In-memory store: resets whenever the server restarts.
 const users: User[] = [];
 
+export function GET() {
+  return Response.json(users);
+}
+
 export async function POST(request: Request) {
   let body: unknown;
   try {
