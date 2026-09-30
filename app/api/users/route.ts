@@ -1,11 +1,12 @@
-type User = {
-  id: string;
-  name: string;
-  email: string;
-};
+import { users, nextUserId, type User } from "./store";
 
-// In-memory store: resets whenever the server restarts.
-const users: User[] = [];
+function badRequest(error: string) {
+  return Response.json({ error }, { status: 400 });
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
 
 export function GET() {
   return Response.json(users);
@@ -16,19 +17,25 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Request body must be valid JSON." }, { status: 400 });
+    return badRequest("Request body must be valid JSON.");
   }
 
-  const { name, email } = (body ?? {}) as Record<string, unknown>;
+  const { fullName, email, school, age } = (body ?? {}) as Record<string, unknown>;
 
-  if (typeof name !== "string" || name.trim() === "") {
-    return Response.json({ error: '"name" is required.' }, { status: 400 });
-  }
-  if (typeof email !== "string" || email.trim() === "") {
-    return Response.json({ error: '"email" is required.' }, { status: 400 });
+  if (!nonEmptyString(fullName)) return badRequest('"fullName" is required.');
+  if (!nonEmptyString(email)) return badRequest('"email" is required.');
+  if (!nonEmptyString(school)) return badRequest('"school" is required.');
+  if (typeof age !== "number" || !Number.isInteger(age) || age <= 0) {
+    return badRequest('"age" must be a positive whole number.');
   }
 
-  const user: User = { id: crypto.randomUUID(), name: name.trim(), email: email.trim() };
+  const user: User = {
+    id: nextUserId(),
+    fullName: fullName.trim(),
+    email: email.trim(),
+    school: school.trim(),
+    age,
+  };
   users.push(user);
 
   return Response.json(user, { status: 201 });
