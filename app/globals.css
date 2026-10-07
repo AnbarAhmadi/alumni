@@ -325,3 +325,42 @@ a {
   opacity: 0.6;
   cursor: default;
 }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-header .section-title {
+  margin: 0;
+}
+
+.empty {
+  padding: 1.5rem;
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.notice {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 6px;
+  background: #fdf3dc;
+  color: #8a6210;
+  font-weight: 600;
+}
+
+.table tr.highlight td {
+  background: #fdf3dc;
+}
+
+.field .form-error {
+  font-weight: 400;
+  font-size: 0.9rem;
+}

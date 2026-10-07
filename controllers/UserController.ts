@@ -27,8 +27,8 @@ function attempt<T>(action: () => T | null, notFoundMessage = "Not found."): Res
   }
 }
 
-export function index(): User[] {
-  return UserModel.getAll();
+export function index(): Result<User[]> {
+  return { ok: true, data: UserModel.getAll() };
 }
 
 export function show(id: string | number): User | null {

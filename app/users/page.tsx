@@ -9,19 +9,24 @@ export const metadata: Metadata = {
   title: "Users | Alumni Tracking System",
 };
 
-export default async function UsersPage() {
+// GET /users: list (Read). The form below posts back to /users (Create).
+export default async function UsersPage({ searchParams }: PageProps<"/users">) {
   // Users live in memory and change at runtime, so render on every request.
   await connection();
-  const users = UserController.index();
+  const { data: users } = UserController.index();
+  const { created } = await searchParams;
 
   return (
     <main className="container stack">
       <section>
-        <h2 className="section-title">Users ({users.length})</h2>
-        <UserTable users={users} deleteAction={deleteUserAction} />
+        <div className="page-header">
+          <h2 className="section-title">Users ({users.length})</h2>
+          <a href="#new-user" className="button primary">+ New user</a>
+        </div>
+        <UserTable users={users} highlightId={Number(created)} deleteAction={deleteUserAction} />
       </section>
 
-      <section className="panel">
+      <section id="new-user" className="panel">
         <h2 className="section-title">Add a user</h2>
         <UserForm action={createUserAction} submitLabel="Create user" />
       </section>

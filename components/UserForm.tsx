@@ -31,20 +31,30 @@ export default function UserForm({ action, user, submitLabel }: Props) {
 
   return (
     <form action={formAction} className="form">
-      {FIELDS.map((field) => (
-        <label key={field.name} className={state.field === field.name ? "field invalid" : "field"}>
-          <span>{field.label}</span>
-          <input
-            name={field.name}
-            type={field.type}
-            defaultValue={valueOf(field.name)}
-            required={field.required && !user}
-            min={field.type === "number" ? 1 : undefined}
-          />
-        </label>
-      ))}
+      {FIELDS.map((field) => {
+        const invalid = state.field === field.name;
+        return (
+          <label key={field.name} className={invalid ? "field invalid" : "field"}>
+            <span>{field.label}</span>
+            <input
+              name={field.name}
+              type={field.type}
+              defaultValue={valueOf(field.name)}
+              required={field.required && !user}
+              min={field.type === "number" ? 1 : undefined}
+              aria-invalid={invalid || undefined}
+            />
+            {invalid && (
+              <span className="form-error" role="alert">
+                {state.error}
+              </span>
+            )}
+          </label>
+        );
+      })}
 
-      {state.error && (
+      {/* Errors that aren't about one field, e.g. "Send at least one of: ..." */}
+      {state.error && !state.field && (
         <p className="form-error" role="alert">
           {state.error}
         </p>

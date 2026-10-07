@@ -22,7 +22,7 @@ export async function createUserAction(
   if (!result.ok) return { error: result.error, field: result.field, values: typedValues(formData) };
 
   revalidatePath("/users");
-  redirect(`/users/${result.data.id}`);
+  redirect(`/users?created=${result.data.id}`);
 }
 
 export async function updateUserAction(
