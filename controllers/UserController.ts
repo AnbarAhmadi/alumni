@@ -31,8 +31,10 @@ export function index(): Result<User[]> {
   return { ok: true, data: UserModel.getAll() };
 }
 
-export function show(id: string | number): User | null {
-  return UserModel.getById(toId(id));
+export function show(id: string | number): Result<User> {
+  const user = UserModel.getById(toId(id));
+  if (!user) return { ok: false, error: `User "${id}" not found.` };
+  return { ok: true, data: user };
 }
 
 export function create(formData: FormData): Result<User> {

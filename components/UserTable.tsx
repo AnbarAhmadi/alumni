@@ -47,7 +47,8 @@ export default function UserTable({ users, highlightId, deleteAction }: Props) {
                 <td>{user.school ?? "—"}</td>
                 <td className="actions">
                   <Link href={`/users/${user.id}`} className="button">View</Link>
-                  <DeleteUserButton action={deleteAction.bind(null, user.id)} />
+                  <Link href={`/users/${user.id}/edit`} className="button">Edit</Link>
+                  <DeleteUserButton action={deleteAction.bind(null, user.id)} name={user.fullName} />
                 </td>
               </tr>
             ))}

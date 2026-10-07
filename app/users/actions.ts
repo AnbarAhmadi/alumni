@@ -34,7 +34,7 @@ export async function updateUserAction(
   if (!result.ok) return { error: result.error, field: result.field, values: typedValues(formData) };
 
   revalidatePath("/users");
-  redirect(`/users/${id}`);
+  redirect(`/users/${id}?updated=1`);
 }
 
 export async function deleteUserAction(id: number) {

@@ -204,6 +204,7 @@ a {
 .panel {
   background: var(--card);
   border: 1px solid var(--border);
+  border-top: 4px solid var(--gold);
   border-radius: 10px;
   padding: 1.5rem;
 }
@@ -363,4 +364,18 @@ a {
 .field .form-error {
   font-weight: 400;
   font-size: 0.9rem;
+}
+
+.user-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
