@@ -66,11 +66,23 @@ export const openApiSpec = {
       post: {
         tags: ["Users"],
         summary: "Create a user",
-        description: "The id is assigned by the server, counting up from 1.",
-        requestBody: { required: true, content: json(ref("UserInput")) },
+        description:
+          "The id is assigned by the server, counting up from 1. The body can be JSON, multipart/form-data or application/x-www-form-urlencoded; school is optional.",
+        requestBody: {
+          required: true,
+          content: {
+            ...json(ref("UserCreate")),
+            "multipart/form-data": { schema: ref("UserCreate") },
+            "application/x-www-form-urlencoded": { schema: ref("UserCreate") },
+          },
+        },
         responses: {
           201: { description: "The created user.", content: json(ref("User")) },
           400: invalidBody,
+          415: errorResponse(
+            "The Content-Type is not JSON or form data.",
+            'Unsupported Content-Type "text/plain". Use application/json, multipart/form-data or application/x-www-form-urlencoded.',
+          ),
         },
       },
     },
@@ -157,9 +169,19 @@ export const openApiSpec = {
     schemas: {
       User: {
         type: "object",
-        required: ["id", "fullName", "email", "school", "age"],
+        required: ["id", "fullName", "email", "age"],
         properties: {
           id: { type: "integer", example: 1 },
+          fullName: { type: "string", example: "Anberin Ahmadi" },
+          email: { type: "string", example: "a@example.com" },
+          school: { type: "string", example: "UNI" },
+          age: { type: "integer", minimum: 1, example: 21 },
+        },
+      },
+      UserCreate: {
+        type: "object",
+        required: ["fullName", "email", "age"],
+        properties: {
           fullName: { type: "string", example: "Anberin Ahmadi" },
           email: { type: "string", example: "a@example.com" },
           school: { type: "string", example: "UNI" },
