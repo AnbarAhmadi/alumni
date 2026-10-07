@@ -81,9 +81,11 @@ export const openApiSpec = {
   tags: [
     { name: "Users", description: "JSON API for users: create, read, update and delete." },
     {
-      name: "User pages",
+      name: "Users (views)",
       description:
-        "HTML pages for users. Their create, edit and delete forms use Next.js server actions, which are internal; use the Users API for programmatic access.",
+        "HTML pages for users (page -> UserController -> UserModel -> view components). " +
+        "The POST operations are the pages' forms: Next.js server actions that post back to the page URL with an internal action id the page provides. " +
+        "They are documented for completeness and can't be sent from Swagger's Try it out; use the Users JSON API for programmatic access.",
     },
     { name: "Health", description: "Check that the API is running." },
     { name: "Examples", description: "Simple plain-text example routes." },
@@ -177,21 +179,103 @@ export const openApiSpec = {
     },
     "/users": {
       get: {
-        tags: ["User pages"],
-        summary: "Users page (HTML)",
-        description: "Lists all users in a table, with View and Delete buttons and a form to add a user.",
-        responses: { 200: { description: "The HTML page.", content: html } },
+        tags: ["Users (views)"],
+        summary: "List users (HTML)",
+        description:
+          "UserController.index -> UserModel.getAll -> UserTable. Shows all users with View, Edit and Delete buttons, " +
+          "an \"Add a user\" form, and an empty-state message when there are no users.",
+        parameters: [
+          {
+            name: "created",
+            in: "query",
+            required: false,
+            description: "Id of a just-created user; that row is highlighted with an \"Added <name>\" notice.",
+            schema: { type: "integer", example: 4 },
+          },
+        ],
+        responses: { 200: { description: "The users page.", content: html } },
+      },
+      post: {
+        tags: ["Users (views)"],
+        summary: "Create a user (form on /users)",
+        description:
+          "The \"Add a user\" form: createUserAction -> UserController.create -> UserModel.create. " +
+          "The Delete button on each row also posts here (deleteUserAction -> UserController.remove), after a confirmation in the browser.",
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: ref("UserCreate"),
+              example: { fullName: "Ayşe Yılmaz", email: "ayse.yilmaz@example.com", age: 24, school: "Istanbul University" },
+            },
+          },
+        },
+        responses: {
+          303: { description: "Created: redirects to /users?created={id}, which highlights the new user." },
+          200: {
+            description: "Validation error: the page is shown again with the message under the field and the typed values kept.",
+            content: html,
+          },
+        },
       },
     },
     "/users/{id}": {
       parameters: [userIdParam],
       get: {
-        tags: ["User pages"],
-        summary: "User details page (HTML)",
-        description: "Shows one user, with a Delete button and an edit form.",
+        tags: ["Users (views)"],
+        summary: "User details (HTML)",
+        description:
+          "UserController.show -> UserModel.getById -> UserDetails. Shows every field as label/value rows, with Edit and Delete buttons.",
+        parameters: [
+          {
+            name: "updated",
+            in: "query",
+            required: false,
+            description: "Set after a successful edit; shows a \"Changes saved.\" notice.",
+            schema: { type: "integer", example: 1 },
+          },
+        ],
         responses: {
-          200: { description: "The HTML page.", content: html },
-          404: { description: "No user has this id; the not-found page is shown.", content: html },
+          200: { description: "The details page.", content: html },
+          404: { description: "No user has this id: the \"User not found\" page is shown.", content: html },
+        },
+      },
+      post: {
+        tags: ["Users (views)"],
+        summary: "Delete a user (button on the details page)",
+        description:
+          "deleteUserAction -> UserController.remove -> UserModel.remove, after a confirmation in the browser. Sends no form fields.",
+        responses: {
+          303: { description: "Deleted: redirects to /users." },
+        },
+      },
+    },
+    "/users/{id}/edit": {
+      parameters: [userIdParam],
+      get: {
+        tags: ["Users (views)"],
+        summary: "Edit user form (HTML)",
+        description: "UserController.show -> UserModel.getById -> UserForm, prefilled with the user's current values.",
+        responses: {
+          200: { description: "The edit page.", content: html },
+          404: { description: "No user has this id: the \"User not found\" page is shown.", content: html },
+        },
+      },
+      post: {
+        tags: ["Users (views)"],
+        summary: "Update a user (edit form)",
+        description:
+          "updateUserAction -> UserController.update -> UserModel.update. A partial update: empty fields keep their current value.",
+        requestBody: {
+          required: true,
+          content: { "multipart/form-data": { schema: ref("UserPatch"), example: { age: 25 } } },
+        },
+        responses: {
+          303: { description: "Saved: redirects to /users/{id}?updated=1." },
+          200: {
+            description: "Validation error, or no field filled in: the form is shown again with the message.",
+            content: html,
+          },
         },
       },
     },

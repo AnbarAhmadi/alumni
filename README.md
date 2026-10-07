@@ -122,7 +122,7 @@ npm installnpm run dev
 In Next.js the `app/` folder is the router: a file's location decides its URL. Route files (`route.ts`, `page.tsx`) stay thin and hand each request to a controller. There are two controllers for the same model:
 
 - `ApiUserController` answers the JSON API (`/api/users`) with HTTP status codes.
-- `UserController` serves the web pages (`/users`) and returns plain data for the pages and their forms.
+- `UserController` serves the web pages (`/users`) and returns `{ ok, data, error }` results to the pages and their server actions, with no HTTP code.
 
 Both controllers reach the data only through `UserModel`. Users are currently kept **in memory** (no database), so they reset when the server restarts; the server starts with 3 sample users. Moving to a database later only changes `models/User.ts`.
 
@@ -134,12 +134,13 @@ alumni/
 │   └── User.ts                    # Model: User type, in-memory store, validation, UserModel CRUD
 ├── controllers/
 │   ├── ApiUserController.ts       # Controller for the JSON API: status codes and error responses
-│   └── UserController.ts          # Controller for the web pages: returns plain data or { ok, data, error }
+│   └── UserController.ts          # Controller for the web pages: index/show/create/update/remove return { ok, data, error }
 ├── components/                    # Views: reusable React UI
-│   ├── UserTable.tsx              # Table of all users with View and Delete buttons
-│   ├── UserDetails.tsx            # One user shown as label/value pairs
-│   ├── UserForm.tsx               # Create/edit form; shows validation errors (client component)
-│   └── DeleteUserButton.tsx       # One-button form that runs the delete action
+│   ├── UserTable.tsx              # Users table with View/Edit/Delete; empty state; "Added <name>" notice
+│   ├── UserDetails.tsx            # One user shown as label/value rows
+│   ├── UserForm.tsx               # Create/edit form; error under the field, typed values kept (client component)
+│   ├── DeleteUserButton.tsx       # Delete button that asks for confirmation first (client component)
+│   └── UserNav.tsx                # Links between list, details, edit and "New user"
 ├── lib/
 │   └── parseBody.ts               # Reads JSON, multipart/form-data and urlencoded bodies; drops "id"
 ├── app/                           # Routes: the file path is the URL
@@ -149,8 +150,10 @@ alumni/
 │   ├── about/page.tsx             # About page (/about)
 │   ├── users/
 │   │   ├── page.tsx               # Users list + "Add a user" form (/users)
-│   │   ├── [id]/page.tsx          # User details + edit form + delete (/users/:id)
-│   │   └── actions.ts             # Server actions behind the create, edit and delete forms
+│   │   ├── [id]/page.tsx          # User details with Edit and Delete (/users/:id)
+│   │   ├── [id]/edit/page.tsx     # Edit form, prefilled (/users/:id/edit)
+│   │   ├── [id]/not-found.tsx     # Friendly "User not found" view for unknown ids
+│   │   └── actions.ts             # Server actions: createUserAction, updateUserAction, deleteUserAction
 │   ├── api/
 │   │   ├── users/route.ts         # GET, POST /api/users → ApiUserController
 │   │   ├── users/[id]/route.ts    # GET, PUT, PATCH, DELETE /api/users/:id → ApiUserController
@@ -167,28 +170,32 @@ alumni/
 └── package.json
 ```
 
-### Routes, controllers and models
+### Routes, controllers, models and views
 
-**JSON API (`ApiUserController`)**
+**Web pages (`UserController`)**: the page or server action calls the controller, the controller calls the model, and the result is shown by view components from `components/`.
 
-| Route | Controller function | Model function(s) |
-| --- | --- | --- |
-| `GET /api/users` | `ApiUserController.getAll` | `UserModel.getAll` |
-| `POST /api/users` | `ApiUserController.create` | `UserModel.create` |
-| `GET /api/users/:id` | `ApiUserController.getById` | `UserModel.getById` |
-| `PUT /api/users/:id` | `ApiUserController.replace` | `UserModel.getById`, `UserModel.replace` |
-| `PATCH /api/users/:id` | `ApiUserController.update` | `UserModel.getById`, `UserModel.update` |
-| `DELETE /api/users/:id` | `ApiUserController.remove` | `UserModel.remove` |
+| Route | Server action | Controller function | Model function | View |
+| --- | --- | --- | --- | --- |
+| `GET /users` | | `UserController.index` | `UserModel.getAll` | `UserTable`, `UserForm` |
+| `POST /users` ("Add a user" form) | `createUserAction` | `UserController.create` | `UserModel.create` | Redirect to `/users?created=:id` (row highlighted); errors shown in `UserForm` |
+| `POST /users` (Delete on a row) | `deleteUserAction` | `UserController.remove` | `UserModel.remove` | Redirect to `/users` |
+| `GET /users/:id` | | `UserController.show` | `UserModel.getById` | `UserNav`, `UserDetails`, `DeleteUserButton`; `not-found.tsx` if no user |
+| `POST /users/:id` (Delete) | `deleteUserAction` | `UserController.remove` | `UserModel.remove` | Redirect to `/users` |
+| `GET /users/:id/edit` | | `UserController.show` | `UserModel.getById` | `UserNav`, `UserForm` (prefilled); `not-found.tsx` if no user |
+| `POST /users/:id/edit` (Save) | `updateUserAction` | `UserController.update` | `UserModel.update` | Redirect to `/users/:id?updated=1`; errors shown in `UserForm` |
 
-**Web pages (`UserController`)**
+The POST rows are the pages' forms: Next.js server actions post back to the URL of the page the form is on.
 
-| Route / action | Controller function | Model function |
-| --- | --- | --- |
-| `GET /users` (page) | `UserController.index` | `UserModel.getAll` |
-| `GET /users/:id` (page) | `UserController.show` | `UserModel.getById` |
-| "Add a user" form on `/users` (`createUserAction`) | `UserController.create` | `UserModel.create` |
-| Edit form on `/users/:id` (`updateUserAction`) | `UserController.update` | `UserModel.update` |
-| Delete button (`deleteUserAction`) | `UserController.remove` | `UserModel.remove` |
+**JSON API (`ApiUserController`)**: the response is JSON instead of a view.
+
+| Route | Controller function | Model function(s) | Response |
+| --- | --- | --- | --- |
+| `GET /api/users` | `ApiUserController.getAll` | `UserModel.getAll` | `200` list of users |
+| `POST /api/users` | `ApiUserController.create` | `UserModel.create` | `201` user, `400`, `415` |
+| `GET /api/users/:id` | `ApiUserController.getById` | `UserModel.getById` | `200` user, `404` |
+| `PUT /api/users/:id` | `ApiUserController.replace` | `UserModel.getById`, `UserModel.replace` | `200` user, `400`, `404`, `415` |
+| `PATCH /api/users/:id` | `ApiUserController.update` | `UserModel.getById`, `UserModel.update` | `200` user, `400`, `404`, `415` |
+| `DELETE /api/users/:id` | `ApiUserController.remove` | `UserModel.remove` | `204` no body, `404` |
 
 `/api/health`, `/api/swagger`, `/hello` and `/sum` have no data, so they answer directly without a controller or model.
 
@@ -205,7 +212,7 @@ The web pages follow the same steps, except that in step 4 the page passes the d
 
 ### API documentation (Swagger)
 
-With the app running (`npm run dev`), open **http://localhost:3000/api/swagger** for the Swagger UI. It documents the JSON API (`/api/users`, `/api/users/{id}`) and the `/users` pages, with request bodies in JSON and form-data, response codes and examples. Use **Try it out** to send requests from the browser. The raw OpenAPI spec is at `/api/swagger/openapi.json`.
+With the app running (`npm run dev`), open **http://localhost:3000/api/swagger** for the Swagger UI. The **Users** tag documents the JSON API (`/api/users`, `/api/users/{id}`) with request bodies in JSON and form-data, response codes and examples. The **Users (views)** tag documents the HTML pages (`/users`, `/users/{id}`, `/users/{id}/edit`) and their form actions; those are server actions, so they can't be sent with Try it out. Use **Try it out** to send requests from the browser. The raw OpenAPI spec is at `/api/swagger/openapi.json`.
 
 ---
 ## 🏫 Course Information
