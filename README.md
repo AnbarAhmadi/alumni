@@ -37,13 +37,12 @@ Features have will be defined and added as the course progresses.
 
 | Category | Technology |
 | --- | --- |
-| Language | TypeScript |
+| Language | TypeScript (TypeScript 7 for type checking; the TypeScript 6 API is installed alongside it for ESLint) |
 | Framework | Next.js 16 (App Router, Turbopack), React 19 |
-| Database | Supabase (hosted PostgreSQL), Prisma 7 (`@prisma/adapter-pg`) |
-| Containerization | Docker, Docker Compose (multi-stage build, Next.js `standalone` output) |
-| Data Export | `json2csv` (CSV), `exceljs` (Excel) |
-| DevOps | Git & GitHub, npm, Node.js v24 LTS (`nvm`) |
-| Tools | ESLint, `tsx`, Prisma Studio |
+| Architecture | MVC: in-memory User model, two controllers, React view components |
+| Data | In memory (`models/User.ts`); no database yet, so data resets when the server restarts |
+| API documentation | OpenAPI 3 spec with Swagger UI (loaded from the unpkg CDN) |
+| Tools | ESLint 9 with `eslint-config-next`, npm, Git & GitHub |
 
 ---
 ## 📁 Project Structure
@@ -63,50 +62,56 @@ alumni/
 ├── controllers/       # Controllers: UserController (web pages), ApiUserController (JSON API)
 ├── components/        # Views: reusable React components
 ├── lib/               # Shared helpers (request body parser)
+├── eslint.config.mjs  # ESLint config (Next.js recommended + TypeScript rules)
 ├── next.config.ts     # Next.js config (output: "standalone")
 ├── tsconfig.json      # TypeScript config ("@/..." import alias)
 ├── package.json
 └── README.md
 ```
 
-Planned but not in this repository yet: the database (Supabase PostgreSQL with Prisma), the Docker setup, and the alumni pages and API routes.
-
 ---
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- A Supabase project (free tier is enough)
-- Node.js 20+ (only needed if running outside Docker)
+- Node.js 20.9 or later (developed with Node.js 24)
+- npm
 
-**Environment setup**
+No database or environment variables are needed: users are kept in memory, the server starts with 3 sample users, and they reset when the server restarts.
 
-bash
-
-```bash
-cp .env.example .env
-```
-
-Then fill in `DATABASE_URL` and `DIRECT_URL` as shown above.
-
-Run with Docker (recommended)
-
-bash
+### Run in development
 
 ```bash
-docker compose up --build
+npm install
+npm run dev
 ```
 
-The app will be available at `http://localhost:3000`.
+Then open:
 
-Run locally without Docker
+- http://localhost:3000/users for the users pages (list, create, view, edit, delete)
+- http://localhost:3000/api/users for the JSON API
+- http://localhost:3000/api/swagger for the API documentation
 
-bash
+### Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Starts the development server at http://localhost:3000 |
+| `npm run build` | Creates a production build (also type-checks the code) |
+| `npm run lint` | Runs ESLint |
+| `npx tsc --noEmit` | Type-checks the code without building |
+
+### Run a production build
+
+`next.config.ts` uses `output: "standalone"`, so the production build is started with the generated `server.js` rather than `npm start`:
 
 ```bash
-npm installnpm run dev
+npm run build
+cp -r .next/static .next/standalone/.next/
+node .next/standalone/server.js
 ```
+
+The app is then at http://localhost:3000 (set `PORT` to use another port).
 
 ---
 ## 🏗️ MVC Architecture
@@ -213,6 +218,17 @@ The web pages follow the same steps, except that in step 4 the page passes the d
 ### API documentation (Swagger)
 
 With the app running (`npm run dev`), open **http://localhost:3000/api/swagger** for the Swagger UI. The **Users** tag documents the JSON API (`/api/users`, `/api/users/{id}`) with request bodies in JSON and form-data, response codes and examples. The **Users (views)** tag documents the HTML pages (`/users`, `/users/{id}`, `/users/{id}/edit`) and their form actions; those are server actions, so they can't be sent with Try it out. Use **Try it out** to send requests from the browser. The raw OpenAPI spec is at `/api/swagger/openapi.json`.
+
+---
+## 🔭 Planned / Future Work
+
+These are planned for later in the course and are **not in this repository yet**:
+
+- **Database:** Supabase (hosted PostgreSQL) with Prisma, replacing the in-memory store in `models/User.ts`. Because the controllers only call `UserModel`, they shouldn't need to change.
+- **Alumni records:** an alumni directory with graduation details and current job, with its own pages and API routes.
+- **Docker:** a Dockerfile and Docker Compose setup for running the app in containers.
+- **Data export:** exporting records to CSV and Excel.
+- **Authentication:** deferred for now; the current pages and API are open to anyone.
 
 ---
 ## 🏫 Course Information
