@@ -1,118 +1,272 @@
 # Alumni Tracking System
 
 **Management Information Systems Department — Istanbul University**
-> A full-stack web platform that keeps universities connected to their graduates, built a semester-long project from scratch for Web Programming course.
->
-## 📖 Project Overview
 
-The Web-Based Alumni Tracking System is a centralized platform built to strengthen the connection between Istanbul University and its graduates, since universities frequently lose contact with students after graduation. It replaces scattered, department-by-department record-keeping with one secure database, keeps alumni information current through user-driven profile updates, and helps current students and graduates connect for mentorship and professional networking.
-
-All project decisions and progress — architecture desicion, design, and each round of development — will be documented and version-controlled in this repository as the semester unfolds.
+> A full-stack web platform that keeps universities connected to their graduates, built from scratch as a semester-long project for the Web Programming course.
 
 ---
-## 🎓Prior Coursework: System Analysis & Design
 
-The system analysis and design work behind this project was completed previously, as an assignment for the **System Analysis and Design** course. That earlier deliverable already covers the mandatory analysis and design content this project builds on:
+## 📖 About
 
-1. **System Overview** — title, team members, course info, project introduction, problem definition, scope and assumptions
-2. **Requirements Analysis** — functional and non-functional requirements, user requirements and stakeholder groups, constraints and business rules
-3. **Use Case Analysis** — use case list, use case diagram, and detailed use case description
-4. **Process Modeling** — activity diagram and system workflow
-5. **Data Modeling** — entity–relationship diagram (ERD) and data dictionary
-6. **System & Architecture Design** — system architecture (layered/client–server/MVC), hardware and software architecture overview
-7. **User Interface Design** — UI mockups and navigation structure (site map)
-8. **Program Design** — sequence diagram, class diagram, module descriptions
-9. **Quality Assurance & Transition** — testing strategy, risks and mitigation plan, deployment/transition considerations
-10. **Conclusion** — expected benefits, limitations, future enhancements
+The Web-Based Alumni Tracking System is a centralized platform built to strengthen the connection between Istanbul University and its graduates, since universities frequently lose contact with students after graduation. It aims to replace scattered, department-by-department record-keeping with one central database, keep alumni information current through user-driven profile updates, and help current students and graduates connect for mentorship and professional networking.
 
-This Web Programming implementation carries that analysis and design forward into working code; where this build diverges from the original design (e.g. the deferred authentication noted below), it is called out explicitly rather than left implicit.
+All project decisions and progress, including architecture, design and each round of development, are documented and version-controlled in this repository as the semester unfolds.
 
 ---
-## ✨ Features
 
-Features have will be defined and added as the course progresses.
+## 🎓 Prior Coursework: System Analysis & Design
 
----
-## 🛠️ Tech Stack
-
-| Category | Technology |
-| --- | --- |
-| Language | TypeScript |
-| Framework | Next.js 16 (App Router, Turbopack), React 19 |
-| Database | Supabase (hosted PostgreSQL), Prisma 7 (`@prisma/adapter-pg`) |
-| Containerization | Docker, Docker Compose (multi-stage build, Next.js `standalone` output) |
-| Data Export | `json2csv` (CSV), `exceljs` (Excel) |
-| DevOps | Git & GitHub, npm, Node.js v24 LTS (`nvm`) |
-| Tools | ESLint, `tsx`, Prisma Studio |
+The analysis and design of this system were completed earlier in the **System Analysis and Design** course. There we produced the full documentation (requirements, use cases, process models, ERD, UI mockups and UML diagrams) and also developed a working system. This Web Programming project carries that work forward into working code. Where it differs from the original design (for example, authentication is postponed, see Current Limitations), the difference is stated explicitly.
 
 ---
-## 📁 Project Structure
 
-A typical layout for this project, following Next.js App Router conventions:
+## ✨ Features
+
+This project is being built incrementally over the semester. Status is updated weekly.
+
+- [x] **Week 2:** Next.js setup, first routes (`/hello`, `/hello/:name`, `/sum/:a/:b`), home and About pages
+- [x] **Week 3:** Users JSON API with full CRUD (`/api/users`), health check, Swagger UI
+- [x] **Week 4:** MVC refactor (one model, two controllers, view components) and `/users` web pages with list, create, view, edit and delete
+
+### Upcoming
+
+- [ ] **Database:** Supabase (hosted PostgreSQL) with Prisma, replacing the in-memory store in `models/User.ts`
+- [ ] **Alumni records:** graduation details and current job, with their own pages and API routes
+- [ ] **Alumni Directory:** search graduates by year, program, company or city
+- [ ] **My Profile:** graduates keep their own contact and career details up to date
+- [ ] **Mentorship:** connect current students with graduates
+- [ ] **Events & Reunions, Careers & Jobs, News & Success Stories, Contact** pages (shown as "Coming soon" on the home page today)
+- [ ] **Authentication:** login and roles
+- [ ] **Data export:** export records to CSV and Excel
+- [ ] **Docker:** a Dockerfile and Docker Compose setup
+
+---
+
+## 🛠️ Tech Stack
+
+| Category | Technology | Notes |
+| --- | --- | --- |
+| Language | TypeScript | TypeScript 7 for type checking; the TypeScript 6 API is installed alongside it because ESLint needs it |
+| Framework | Next.js 16 (App Router), React 19 | Pages, API routes and server actions all live in `app/` |
+| Runtime | Node.js | Developed with Node.js 24 |
+| Architecture | MVC | One model, two controllers, React view components |
+| Data storage | In memory (`models/User.ts`) | No database yet; data resets when the server restarts |
+| API documentation | OpenAPI 3.0 + Swagger UI | The spec is written in `app/api/swagger/openapi.ts`; Swagger UI is loaded from the unpkg CDN, so it needs an internet connection |
+| Code quality | ESLint 9 with `eslint-config-next` | Next.js core-web-vitals and TypeScript rules |
+| Package manager | npm | |
+| Version control | Git and GitHub | One commit per task, with the week in the message (for example "Week 4: ...") |
+
+---
+
+## 📁 Project Structure
+
+Every file that is committed to the repository, with what it does:
 
 ```
-alumni-tracking-system/
-├── app/
-│   ├── api/
-│   │   ├── alumni/
-│   │   └── export/
-│   ├── alumni/             # now renders dynamically (force-dynamic)
-│   └── layout.tsx
-├── components/
-├── lib/
-│   └── prisma.ts           # Prisma client, using DATABASE_URL (pooled)
-├── prisma/
-│   ├── schema.prisma
-│   └── seed.ts              # uses DATABASE_URL (pooled)
-├── prisma7.config.ts        # Prisma CLI config, uses DIRECT_URL for migrations
-├── public/
-├── Dockerfile                # multi-stage build, Next.js `standalone` output
-├── .dockerignore
-├── docker-compose.yml
-├── .env.example              # DATABASE_URL + DIRECT_URL placeholders
-├── next.config.ts            # output: "standalone"
-├── package.json
-└── README.md
+alumni/
+├── app/                                  # Next.js App Router: a file's folder path is its URL
+│   ├── layout.tsx                        # Wraps every page: site header, navigation links and footer
+│   ├── page.tsx                          # Home page (/): hero section and the "Explore" cards
+│   ├── globals.css                       # Styles for the whole site, including the /users pages
+│   ├── about/
+│   │   └── page.tsx                      # About page (/about): what the system is for
+│   ├── users/                            # The users web pages (HTML)
+│   │   ├── page.tsx                      # /users: users table and the "Add a user" form
+│   │   ├── actions.ts                    # Server actions for the forms: create, update and delete
+│   │   └── [id]/                         # [id] is the user's id from the URL
+│   │       ├── page.tsx                  # /users/:id: one user's details, with Edit and Delete
+│   │       ├── not-found.tsx             # "User not found" page for an unknown id
+│   │       └── edit/
+│   │           └── page.tsx              # /users/:id/edit: the edit form, filled with the user's data
+│   ├── api/                              # JSON API routes
+│   │   ├── health/
+│   │   │   └── route.ts                  # GET /api/health: says the server is running
+│   │   ├── users/
+│   │   │   ├── route.ts                  # GET and POST /api/users → ApiUserController
+│   │   │   └── [id]/
+│   │   │       └── route.ts              # GET, PUT, PATCH and DELETE /api/users/:id → ApiUserController
+│   │   └── swagger/
+│   │       ├── route.ts                  # GET /api/swagger: the Swagger UI page
+│   │       ├── openapi.ts                # The OpenAPI description of every route
+│   │       └── openapi.json/
+│   │           └── route.ts              # GET /api/swagger/openapi.json: serves the spec as JSON
+│   ├── hello/
+│   │   ├── route.ts                      # GET /hello: plain-text "Hello, World!"
+│   │   └── [name]/
+│   │       └── route.ts                  # GET /hello/:name: plain-text greeting with the name
+│   └── sum/
+│       └── [number1]/
+│           └── [number2]/
+│               └── route.ts              # GET /sum/:number1/:number2: adds the two numbers
+├── models/                               # MODEL
+│   └── User.ts                           # User type, in-memory store with 3 sample users, validation, UserModel CRUD
+├── controllers/                          # CONTROLLERS
+│   ├── ApiUserController.ts              # For /api/users: calls UserModel and returns JSON with status codes
+│   └── UserController.ts                 # For /users: calls UserModel and returns { ok, data, error, field }
+├── components/                           # VIEWS (React components)
+│   ├── UserTable.tsx                     # Table of users with View, Edit and Delete; "Added <name>" notice
+│   ├── UserDetails.tsx                   # One user as label/value rows
+│   ├── UserForm.tsx                      # Create and edit form; shows errors under the right field (client component)
+│   ├── DeleteUserButton.tsx              # Delete button that asks "Delete <name>?" first (client component)
+│   └── UserNav.tsx                       # Links: All users, Details, Edit, + New user
+├── lib/                                  # Helpers shared by the controllers
+│   └── parseBody.ts                      # Reads JSON, multipart/form-data and urlencoded bodies; turns age into a number
+├── eslint.config.mjs                     # ESLint setup (Next.js recommended rules + TypeScript rules)
+├── next.config.ts                        # Next.js settings (output: "standalone")
+├── tsconfig.json                         # TypeScript settings; "@/..." imports start at the project root
+├── package.json                          # Project name, npm scripts and dependencies
+├── package-lock.json                     # Exact installed versions of the dependencies
+├── .gitignore                            # Keeps node_modules, .next, .env files and local Postman files out of Git
+├── AGENTS.md                             # Notes for AI coding tools about this Next.js version (written by next dev)
+├── CLAUDE.md                             # Points to AGENTS.md
+└── README.md                             # This file
 ```
+
+Folders that exist on a developer's machine but are **not** committed: `node_modules/` (installed packages), `.next/` (build output) and `postman/` (local Postman files).
+
 ---
-## 🚀 Getting Started
+
+## 🏗️ MVC Architecture
+
+The app follows **MVC (Model–View–Controller)**. Each part has one job:
+
+| Part | Job in this app | Where |
+| --- | --- | --- |
+| **Model** | Holds the users, checks the data is valid, and does create, read, update and delete. It has no HTTP or React code. | `models/User.ts` (`UserModel`) |
+| **View** | Shows data on the screen. The components only display what they are given and never touch the model. | `components/` |
+| **Controller** | Sits in the middle: takes the request, calls the model, and decides what to send back. | `controllers/` |
+
+In Next.js the `app/` folder is the router: where a file is decides its URL. The route and page files are kept thin, so they only pass the request to a controller. The small routes with no data (`/api/health`, `/api/swagger`, `/hello`, `/sum`) answer directly.
+
+There are **two controllers** for the **same model**, because the two kinds of client need different answers:
+
+- **`ApiUserController`** is for programs (curl, Postman, Swagger). It returns JSON with HTTP status codes (`200`, `201`, `204`, `400`, `404`, `415`).
+- **`UserController`** is for the web pages. It returns a result object `{ ok, data, error, field }`, and the page decides which view to show.
+
+Both controllers reach the data only through `UserModel`. When the database is added, only `models/User.ts` should need to change.
+
+### Example: how a request travels through MVC
+
+`POST /api/users` with a JSON body:
+
+1. **Route** (`app/api/users/route.ts`) receives the request and passes it to the controller.
+2. **Controller** (`ApiUserController.create`) reads the body with `parseBody` and calls the model.
+3. **Model** (`UserModel.create`) validates the data, saves the user and returns it.
+4. **Response:** the controller sends `201 Created` with the new user, or `400` with the field name if validation fails.
+
+The `/users` web form follows the same path, except a server action (`createUserAction`) and `UserController` replace the route and `ApiUserController`, and the result is shown by `UserForm` and `UserTable`.
+
+---
+
+## 🧭 All Routes
+
+### Web pages
+
+| URL | Method | What it shows or does |
+| --- | --- | --- |
+| `/` | GET | Home page with the "Explore" cards |
+| `/about` | GET | About the Alumni System |
+| `/users` | GET | Table of all users and the "Add a user" form |
+| `/users` | POST (form) | Add a user, or delete one from a table row |
+| `/users/:id` | GET | One user's details, with Edit and Delete buttons |
+| `/users/:id` | POST (form) | Delete the user |
+| `/users/:id/edit` | GET | Edit form filled with the user's data |
+| `/users/:id/edit` | POST (form) | Save changes (only the filled-in fields change) |
+
+The `POST` rows are form submissions handled by server actions. An unknown id shows the "User not found" page with a `404` status.
+
+### JSON API
+
+| Method | URL | Request body | Success | Errors |
+| --- | --- | --- | --- | --- |
+| GET | `/api/users` | — | `200` array of users | — |
+| POST | `/api/users` | `fullName`, `email`, `age` (required), `school` (optional) | `201` new user | `400` invalid data, `415` unsupported Content-Type |
+| GET | `/api/users/:id` | — | `200` user | `404` not found |
+| PUT | `/api/users/:id` | `fullName`, `email`, `age`, `school` (all required) | `200` updated user | `400`, `404`, `415` |
+| PATCH | `/api/users/:id` | Any of `fullName`, `email`, `age`, `school` (at least one) | `200` updated user | `400`, `404`, `415` |
+| DELETE | `/api/users/:id` | — | `204` no body | `404` not found |
+
+POST, PUT and PATCH accept `application/json`, `multipart/form-data` and `application/x-www-form-urlencoded`. An `id` sent in the body is always ignored: new ids are generated, and other ids come from the URL. Errors come back as `{ "error": "..." }`, with a `field` when one field is to blame.
+
+### Other routes
+
+| URL | Method | What it returns |
+| --- | --- | --- |
+| `/api/health` | GET | `{ "status": "ok" }` |
+| `/api/swagger` | GET | Swagger UI page |
+| `/api/swagger/openapi.json` | GET | The OpenAPI spec as JSON |
+| `/hello` | GET | `Hello, World!` (plain text) |
+| `/hello/:name` | GET | `Hello, <Name>!` (plain text) |
+| `/sum/:number1/:number2` | GET | The sum as plain text, for example `/sum/2/3` → `5`; `400` if either one isn't a number |
+
+---
+
+## 📚 API Documentation
+
+With the app running (`npm run dev`), open the Swagger UI:
+
+**http://localhost:3000/api/swagger**
+
+The raw OpenAPI spec is at http://localhost:3000/api/swagger/openapi.json. Swagger UI is loaded from the unpkg CDN, so the page needs an internet connection.
+
+Swagger groups the routes into four tags:
+
+- **Users:** the JSON API. Each operation shows its request body (as JSON or form-data), its response codes and examples. Use **Try it out** to send real requests from the browser.
+- **Users (views):** the `/users` HTML pages and their forms. The form submissions are server actions, so they are documented but can't be sent with Try it out.
+- **Health:** `/api/health`.
+- **Examples:** `/hello`, `/hello/{name}` and `/sum/{number1}/{number2}`.
+
+---
+
+## ⚠️ Current Limitations
+
+- **No database yet.** Users are kept in memory, so all changes are lost when the server restarts, and every start begins with the same 3 sample users.
+- **No login.** Authentication is deferred, so anyone who can open the site can create, edit and delete users, on the pages and through the API.
+- **The edit form can't clear a field.** Empty fields keep their old value, so `school` can't be removed from the web form. A `PUT` through the API replaces the whole user.
+- **No search, sorting or paging** on the users list.
+- **No automated tests yet.** Routes have been checked by hand, with curl, Postman and Swagger.
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- A Supabase project (free tier is enough)
-- Node.js 20+ (only needed if running outside Docker)
+- Node.js 20.9 or later (developed with Node.js 24)
+- npm
 
-**Environment setup**
+No database or environment variables are needed.
 
-bash
-
-```bash
-cp .env.example .env
-```
-
-Then fill in `DATABASE_URL` and `DIRECT_URL` as shown above.
-
-Run with Docker (recommended)
-
-bash
+### Install and run
 
 ```bash
-docker compose up --build
+npm install
+npm run dev
 ```
 
-The app will be available at `http://localhost:3000`.
+Then open:
 
-Run locally without Docker
+| URL | What you'll see |
+| --- | --- |
+| http://localhost:3000 | Home page |
+| http://localhost:3000/users | Users pages: list, create, view, edit, delete |
+| http://localhost:3000/api/users | The users as JSON |
+| http://localhost:3000/api/swagger | Swagger API documentation |
+| http://localhost:3000/api/health | Health check |
 
-bash
+To try the API from a terminal, create a user with curl:
 
 ```bash
-npm installnpm run dev
+curl -i -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"fullName":"Zeynep Arslan","email":"zeynep.arslan@example.com","age":23,"school":"Istanbul University"}'
 ```
+
+A successful request returns `201 Created` with the new user.
 
 ---
-## 🏫 Course Information
+
+## 🏫 Course Information
 
 - **Course:** Web Programming
 - **Department:** Management Information Systems, Istanbul University
@@ -120,6 +274,7 @@ npm installnpm run dev
 - **Evaluation:** The instructor will select the student project that best demonstrates a working website to actually implement and use as the department's official alumni tracking platform.
 
 ---
-## 📄 License
 
-This project was developed for academic purposes as part of the Web Programming course at Istanbul University. It is not licensed for external use, redistribution, or commercial purposes without permission.# alumni
+## 📄 License
+
+This project was developed for academic purposes as part of the Web Programming course at Istanbul University. It is not licensed for external use, redistribution, or commercial purposes without permission.
