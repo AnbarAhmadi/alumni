@@ -1,4 +1,4 @@
-// OpenAPI description of every route in the app (API routes and the /users pages).
+// OpenAPI description of every route in the app (API routes, the /users pages and the /announcements pages).
 // Keep this in sync when routes change.
 
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
@@ -68,15 +68,44 @@ const validationErrors = {
   invalidJson: ["Request body must be valid JSON."] as [string],
 };
 
+const exampleAnnouncement = {
+  id: 1,
+  title: "Welcome to the Alumni Tracking System",
+  content: "The MIS department now has one place to stay in touch with its graduates. Please keep your details up to date.",
+  author: "MIS Department",
+  createdAt: "2026-09-22T09:00:00.000Z",
+};
+
+const announcementIdParam = {
+  name: "id",
+  in: "path",
+  required: true,
+  description: "The announcement's id.",
+  schema: { type: "integer", minimum: 1, example: 1 },
+};
+
+const announcementNotFound = errorResponse("No announcement has this id.", {
+  notFound: ['Announcement "99" not found.'],
+});
+
+const announcementValidationErrors = {
+  missingTitle: ['"title" is required.', "title"] as [string, string],
+  missingContent: ['"content" is required.', "content"] as [string, string],
+  emptyTitle: ['"title" must be a non-empty string.', "title"] as [string, string],
+  invalidJson: ["Request body must be valid JSON."] as [string],
+};
+
 export const openApiSpec = {
   openapi: "3.0.3",
   info: {
     title: "Alumni System API",
     version: "1.0.0",
     description:
-      "Users are kept in memory (no database) and reset when the server restarts. The server starts with 3 sample users.\n\n" +
+      "Users and announcements are kept in memory (no database) and reset when the server restarts. " +
+      "The server starts with 3 sample users and 3 sample announcements.\n\n" +
       "Write requests (POST, PUT, PATCH) accept `application/json`, `multipart/form-data` or `application/x-www-form-urlencoded`. " +
-      "Any `id` in the body is ignored: ids are generated on create and taken from the URL otherwise.",
+      "Any `id` in the body is ignored: ids are generated on create and taken from the URL otherwise. " +
+      "An announcement's `createdAt` is always set by the server.",
   },
   tags: [
     { name: "Users", description: "JSON API for users: create, read, update and delete." },
@@ -86,6 +115,14 @@ export const openApiSpec = {
         "HTML pages for users (page -> UserController -> UserModel -> view components). " +
         "The POST operations are the pages' forms: Next.js server actions that post back to the page URL with an internal action id the page provides. " +
         "They are documented for completeness and can't be sent from Swagger's Try it out; use the Users JSON API for programmatic access.",
+    },
+    { name: "Announcements", description: "JSON API for announcements: create, read, update and delete." },
+    {
+      name: "Announcements (views)",
+      description:
+        "HTML pages for announcements (page -> AnnouncementController -> AnnouncementModel -> view components). " +
+        "Like the user pages, the POST operations are server actions: documented here, but they can't be sent from Try it out. " +
+        "Use the Announcements JSON API for programmatic access.",
     },
     { name: "Health", description: "Check that the API is running." },
     { name: "Examples", description: "Simple plain-text example routes." },
@@ -279,6 +316,210 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/announcements": {
+      get: {
+        tags: ["Announcements"],
+        summary: "List all announcements",
+        responses: {
+          200: {
+            description: "Every stored announcement.",
+            content: json({ type: "array", items: ref("Announcement") }, [exampleAnnouncement]),
+          },
+        },
+      },
+      post: {
+        tags: ["Announcements"],
+        summary: "Create an announcement",
+        description: "title and content are required; author is optional. id and createdAt are set by the server.",
+        requestBody: writeBody("AnnouncementWrite", {
+          title: "Alumni meetup in October",
+          content: "Graduates and current students are invited to an evening of talks and networking on campus.",
+          author: "Alumni Office",
+        }),
+        responses: {
+          201: {
+            description: "The created announcement.",
+            content: json(ref("Announcement"), {
+              id: 4,
+              title: "Alumni meetup in October",
+              content: "Graduates and current students are invited to an evening of talks and networking on campus.",
+              author: "Alumni Office",
+              createdAt: "2026-10-12T09:00:00.000Z",
+            }),
+          },
+          400: errorResponse("The body can't be read, or a field is missing or empty.", announcementValidationErrors),
+          415: unsupportedType,
+        },
+      },
+    },
+    "/api/announcements/{id}": {
+      parameters: [announcementIdParam],
+      get: {
+        tags: ["Announcements"],
+        summary: "Get one announcement",
+        responses: {
+          200: { description: "The announcement.", content: json(ref("Announcement"), exampleAnnouncement) },
+          404: announcementNotFound,
+        },
+      },
+      put: {
+        tags: ["Announcements"],
+        summary: "Replace an announcement",
+        description:
+          "title and content are required. author is optional, and is removed if it isn't sent. id and createdAt stay the same.",
+        requestBody: writeBody("AnnouncementWrite", {
+          title: "Welcome to the new Alumni Tracking System",
+          content: "Please check that your details are still correct.",
+        }),
+        responses: {
+          200: {
+            description: "The updated announcement.",
+            content: json(ref("Announcement"), {
+              id: 1,
+              title: "Welcome to the new Alumni Tracking System",
+              content: "Please check that your details are still correct.",
+              createdAt: exampleAnnouncement.createdAt,
+            }),
+          },
+          400: errorResponse("The body can't be read, or a field is missing or empty.", announcementValidationErrors),
+          404: announcementNotFound,
+          415: unsupportedType,
+        },
+      },
+      patch: {
+        tags: ["Announcements"],
+        summary: "Update some fields of an announcement",
+        description: "Only the fields sent are changed. At least one field is required.",
+        requestBody: writeBody("AnnouncementPatch", { author: "Alumni Office" }),
+        responses: {
+          200: {
+            description: "The updated announcement.",
+            content: json(ref("Announcement"), { ...exampleAnnouncement, author: "Alumni Office" }),
+          },
+          400: errorResponse("The body can't be read, no field was sent, or a field is empty.", {
+            noFields: ["Send at least one of: title, content, author."],
+            emptyTitle: announcementValidationErrors.emptyTitle,
+          }),
+          404: announcementNotFound,
+          415: unsupportedType,
+        },
+      },
+      delete: {
+        tags: ["Announcements"],
+        summary: "Delete an announcement",
+        responses: {
+          204: { description: "The announcement was deleted. The response has no body." },
+          404: announcementNotFound,
+        },
+      },
+    },
+    "/announcements": {
+      get: {
+        tags: ["Announcements (views)"],
+        summary: "List announcements (HTML)",
+        description:
+          "AnnouncementController.index -> AnnouncementModel.getAll -> AnnouncementTable. Shows all announcements with View, " +
+          "Edit and Delete buttons, an \"Add an announcement\" form, and an empty-state message when there are none.",
+        parameters: [
+          {
+            name: "created",
+            in: "query",
+            required: false,
+            description: "Id of a just-created announcement; that row is highlighted with an \"Added\" notice.",
+            schema: { type: "integer", example: 4 },
+          },
+        ],
+        responses: { 200: { description: "The announcements page.", content: html } },
+      },
+      post: {
+        tags: ["Announcements (views)"],
+        summary: "Create an announcement (form on /announcements)",
+        description:
+          "The \"Add an announcement\" form: createAnnouncementAction -> AnnouncementController.create -> AnnouncementModel.create. " +
+          "The Delete button on each row also posts here (deleteAnnouncementAction -> AnnouncementController.remove), " +
+          "after a confirmation in the browser.",
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: ref("AnnouncementWrite"),
+              example: { title: "Mentors wanted", content: "We are looking for graduates who would like to mentor a student." },
+            },
+          },
+        },
+        responses: {
+          303: { description: "Created: redirects to /announcements?created={id}, which highlights the new announcement." },
+          200: {
+            description: "Validation error: the page is shown again with the message under the field and the typed values kept.",
+            content: html,
+          },
+        },
+      },
+    },
+    "/announcements/{id}": {
+      parameters: [announcementIdParam],
+      get: {
+        tags: ["Announcements (views)"],
+        summary: "Announcement details (HTML)",
+        description:
+          "AnnouncementController.show -> AnnouncementModel.getById -> AnnouncementDetails. " +
+          "Shows every field as label/value rows, with Edit and Delete buttons.",
+        parameters: [
+          {
+            name: "updated",
+            in: "query",
+            required: false,
+            description: "Set after a successful edit; shows a \"Changes saved.\" notice.",
+            schema: { type: "integer", example: 1 },
+          },
+        ],
+        responses: {
+          200: { description: "The details page.", content: html },
+          404: { description: "No announcement has this id: the \"Announcement not found\" page is shown.", content: html },
+        },
+      },
+      post: {
+        tags: ["Announcements (views)"],
+        summary: "Delete an announcement (button on the details page)",
+        description:
+          "deleteAnnouncementAction -> AnnouncementController.remove -> AnnouncementModel.remove, " +
+          "after a confirmation in the browser. Sends no form fields.",
+        responses: {
+          303: { description: "Deleted: redirects to /announcements." },
+        },
+      },
+    },
+    "/announcements/{id}/edit": {
+      parameters: [announcementIdParam],
+      get: {
+        tags: ["Announcements (views)"],
+        summary: "Edit announcement form (HTML)",
+        description:
+          "AnnouncementController.show -> AnnouncementModel.getById -> AnnouncementForm, prefilled with the current values.",
+        responses: {
+          200: { description: "The edit page.", content: html },
+          404: { description: "No announcement has this id: the \"Announcement not found\" page is shown.", content: html },
+        },
+      },
+      post: {
+        tags: ["Announcements (views)"],
+        summary: "Update an announcement (edit form)",
+        description:
+          "updateAnnouncementAction -> AnnouncementController.update -> AnnouncementModel.update. " +
+          "A partial update: empty fields keep their current value.",
+        requestBody: {
+          required: true,
+          content: { "multipart/form-data": { schema: ref("AnnouncementPatch"), example: { title: "Mentors wanted (2 places left)" } } },
+        },
+        responses: {
+          303: { description: "Saved: redirects to /announcements/{id}?updated=1." },
+          200: {
+            description: "Validation error, or no field filled in: the form is shown again with the message.",
+            content: html,
+          },
+        },
+      },
+    },
     "/api/health": {
       get: {
         tags: ["Health"],
@@ -372,6 +613,36 @@ export const openApiSpec = {
           email: { type: "string", format: "email", description: "Must be unique (ignoring case)." },
           age: { type: "integer", minimum: 1 },
           school: { type: "string" },
+        },
+      },
+      Announcement: {
+        type: "object",
+        required: ["id", "title", "content", "createdAt"],
+        properties: {
+          id: { type: "integer", example: 1 },
+          title: { type: "string", example: exampleAnnouncement.title },
+          content: { type: "string", example: exampleAnnouncement.content },
+          author: { type: "string", example: exampleAnnouncement.author },
+          createdAt: { type: "string", format: "date-time", example: exampleAnnouncement.createdAt },
+        },
+      },
+      AnnouncementWrite: {
+        type: "object",
+        description: "Used by POST and PUT. id and createdAt are set by the server and ignored if sent.",
+        required: ["title", "content"],
+        properties: {
+          title: { type: "string", minLength: 1 },
+          content: { type: "string", minLength: 1 },
+          author: { type: "string", minLength: 1 },
+        },
+      },
+      AnnouncementPatch: {
+        type: "object",
+        minProperties: 1,
+        properties: {
+          title: { type: "string", minLength: 1 },
+          content: { type: "string", minLength: 1 },
+          author: { type: "string", minLength: 1 },
         },
       },
       Error: {
