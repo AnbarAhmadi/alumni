@@ -1,75 +1,35 @@
 # Alumni Tracking System
 
 **Management Information Systems Department — Istanbul University**
+
 > A full-stack web platform that keeps universities connected to their graduates, built from scratch as a semester-long project for the Web Programming course.
 
 ---
+
 ## 📖 About
 
-The Web-Based Alumni Tracking System is a centralized platform built to strengthen the connection between Istanbul University and its graduates, since universities frequently lose contact with students after graduation. It replaces scattered, department-by-department record-keeping with one secure database, keeps alumni information current through user-driven profile updates, and helps current students and graduates connect for mentorship and professional networking.
+The Web-Based Alumni Tracking System is a centralized platform built to strengthen the connection between Istanbul University and its graduates, since universities frequently lose contact with students after graduation. It aims to replace scattered, department-by-department record-keeping with one central database, keep alumni information current through user-driven profile updates, and help current students and graduates connect for mentorship and professional networking.
 
-All project decisions and progress — architecture decisions, design, and each round of development — are documented and version-controlled in this repository as the semester unfolds.
+All project decisions and progress, including architecture, design and each round of development, are documented and version-controlled in this repository as the semester unfolds.
 
 ---
+
 ## 🎓 Prior Coursework: System Analysis & Design
 
-The system analysis and design work behind this project was completed previously, as an assignment for the **System Analysis and Design** course. That earlier deliverable already covers the mandatory analysis and design content this project builds on:
-
-1. **System Overview** — title, team members, course info, project introduction, problem definition, scope and assumptions
-2. **Requirements Analysis** — functional and non-functional requirements, user requirements and stakeholder groups, constraints and business rules
-3. **Use Case Analysis** — use case list, use case diagram, and detailed use case description
-4. **Process Modeling** — activity diagram and system workflow
-5. **Data Modeling** — entity–relationship diagram (ERD) and data dictionary
-6. **System & Architecture Design** — system architecture (layered/client–server/MVC), hardware and software architecture overview
-7. **User Interface Design** — UI mockups and navigation structure (site map)
-8. **Program Design** — sequence diagram, class diagram, module descriptions
-9. **Quality Assurance & Transition** — testing strategy, risks and mitigation plan, deployment/transition considerations
-10. **Conclusion** — expected benefits, limitations, future enhancements
-
-This Web Programming implementation carries that analysis and design forward into working code; where this build diverges from the original design (e.g. the deferred authentication noted under Current Limitations), it is called out explicitly rather than left implicit.
+The analysis and design of this system were completed earlier in the **System Analysis and Design** course. There we produced the full documentation (requirements, use cases, process models, ERD, UI mockups and UML diagrams) and also developed a working system. This Web Programming project carries that work forward into working code. Where it differs from the original design (for example, authentication is postponed, see Current Limitations), the difference is stated explicitly.
 
 ---
+
 ## ✨ Features
 
-The work is done week by week. Each item below matches commits in this repository's Git history.
+This project is being built incrementally over the semester. Status is updated weekly.
 
-### Week 1 (16–22 Sep 2026): Repository and documentation
-- [x] Created the GitHub repository
-- [x] Wrote the first README: project overview, prior coursework and course information
-- [x] Added the Tech Stack section
-
-### Week 2 (23–24 Sep 2026): Next.js setup and first routes
-- [x] Set up the Next.js app (App Router, TypeScript)
-- [x] `GET /hello`: returns `Hello, World!` as plain text
-- [x] `GET /hello/:name`: greets the name from the URL, capitalized (`/hello/anberin` → `Hello, Anberin!`)
-- [x] `GET /sum/:number1/:number2`: adds two numbers, and returns `400` if either one is not a number
-- [x] Home page with the site header, navigation, footer and "Explore" cards
-- [x] About page (`/about`)
-
-### Week 3 (30 Sep 2026): Users JSON API and Swagger
-- [x] `GET /api/health`: returns `{ "status": "ok" }`
-- [x] `POST /api/users`: creates a user in an in-memory store
-- [x] `GET /api/users` and `GET /api/users/:id`: list all users, or read one
-- [x] `PUT` and `PATCH /api/users/:id`: replace a whole user, or change only some fields
-- [x] `DELETE /api/users/:id`: deletes a user
-- [x] Users have `fullName`, `email`, `age` and an optional `school`, with validation and clear error messages
-- [x] Swagger UI at `/api/swagger`
-
-### Week 4 (7 Oct 2026): MVC refactor and the `/users` web pages
-- [x] `POST /api/users` accepts `multipart/form-data` and urlencoded forms as well as JSON
-- [x] One shared body parser (`lib/parseBody.ts`), so `PUT` and `PATCH` accept the same formats
-- [x] Moved all user data and validation into one **Model** (`models/User.ts`)
-- [x] Added two **Controllers**: `ApiUserController` for the JSON API and `UserController` for the web pages
-- [x] Route files are now thin: each one only hands the request to a controller
-- [x] Added the **Views**: React components for the users table, details, form, delete button and navigation
-- [x] `/users` pages with full CRUD: list, create, view, edit and delete, using Next.js server actions
-- [x] Form errors are shown under the field that caused them, and the typed values are kept
-- [x] A "User not found" page for unknown ids
-- [x] Swagger now also documents the `/users` pages
-- [x] Fixed `npm run lint` (ESLint needs the TypeScript 6 API, so it is installed next to TypeScript 7)
-- [x] Documented the MVC architecture in this README
+- [x] **Week 2:** Next.js setup, first routes (`/hello`, `/hello/:name`, `/sum/:a/:b`), home and About pages
+- [x] **Week 3:** Users JSON API with full CRUD (`/api/users`), health check, Swagger UI
+- [x] **Week 4:** MVC refactor (one model, two controllers, view components) and `/users` web pages with list, create, view, edit and delete
 
 ### Upcoming
+
 - [ ] **Database:** Supabase (hosted PostgreSQL) with Prisma, replacing the in-memory store in `models/User.ts`
 - [ ] **Alumni records:** graduation details and current job, with their own pages and API routes
 - [ ] **Alumni Directory:** search graduates by year, program, company or city
@@ -81,6 +41,7 @@ The work is done week by week. Each item below matches commits in this repositor
 - [ ] **Docker:** a Dockerfile and Docker Compose setup
 
 ---
+
 ## 🛠️ Tech Stack
 
 | Category | Technology | Notes |
@@ -90,13 +51,13 @@ The work is done week by week. Each item below matches commits in this repositor
 | Runtime | Node.js | Developed with Node.js 24 |
 | Architecture | MVC | One model, two controllers, React view components |
 | Data storage | In memory (`models/User.ts`) | No database yet; data resets when the server restarts |
-| API documentation | OpenAPI 3.0 + Swagger UI | The spec is written in `app/api/swagger/openapi.ts`; Swagger UI is loaded from the unpkg CDN |
+| API documentation | OpenAPI 3.0 + Swagger UI | The spec is written in `app/api/swagger/openapi.ts`; Swagger UI is loaded from the unpkg CDN, so it needs an internet connection |
 | Code quality | ESLint 9 with `eslint-config-next` | Next.js core-web-vitals and TypeScript rules |
 | Package manager | npm | |
-| Version control | Git and GitHub | One commit per change; the Week 4 work is on the `mvc-refactor` branch |
-| Planned | Supabase (PostgreSQL), Prisma, Docker | Not in the repository yet; see Upcoming above |
+| Version control | Git and GitHub | One commit per task, with the week in the message (for example "Week 4: ...") |
 
 ---
+
 ## 📁 Project Structure
 
 Every file that is committed to the repository, with what it does:
@@ -164,9 +125,8 @@ alumni/
 Folders that exist on a developer's machine but are **not** committed: `node_modules/` (installed packages), `.next/` (build output) and `postman/` (local Postman files).
 
 ---
-## 🏗️ MVC Architecture
 
-### How the app is split
+## 🏗️ MVC Architecture
 
 The app follows **MVC (Model–View–Controller)**. Each part has one job:
 
@@ -176,7 +136,7 @@ The app follows **MVC (Model–View–Controller)**. Each part has one job:
 | **View** | Shows data on the screen. The components only display what they are given and never touch the model. | `components/` |
 | **Controller** | Sits in the middle: takes the request, calls the model, and decides what to send back. | `controllers/` |
 
-In Next.js the `app/` folder is the router: where a file is decides its URL. I kept those route files thin, so they only pass the request to a controller.
+In Next.js the `app/` folder is the router: where a file is decides its URL. The route and page files are kept thin, so they only pass the request to a controller. The small routes with no data (`/api/health`, `/api/swagger`, `/hello`, `/sum`) answer directly.
 
 There are **two controllers** for the **same model**, because the two kinds of client need different answers:
 
@@ -185,108 +145,48 @@ There are **two controllers** for the **same model**, because the two kinds of c
 
 Both controllers reach the data only through `UserModel`. When the database is added, only `models/User.ts` should need to change.
 
-### Files by MVC role
+### Example: how a request travels through MVC
 
-| Role | Files | What they do |
-| --- | --- | --- |
-| Model | `models/User.ts` | `User` type, in-memory store, validation (`ValidationError`), `UserModel.getAll`, `getById`, `create`, `update`, `replace`, `remove` |
-| Controller (API) | `controllers/ApiUserController.ts` | `getAll`, `getById`, `create`, `update`, `replace`, `remove`, which return JSON responses |
-| Controller (web) | `controllers/UserController.ts` | `index`, `show`, `create`, `update`, `remove`, which return `{ ok, data, error, field }` |
-| Controller helper | `lib/parseBody.ts` | `parseBody` reads the request body; `formDataToObject` turns form fields into an object |
-| View | `components/UserTable.tsx`, `UserDetails.tsx`, `UserForm.tsx`, `DeleteUserButton.tsx`, `UserNav.tsx` | React components that render the users |
-| View (pages) | `app/users/page.tsx`, `app/users/[id]/page.tsx`, `app/users/[id]/edit/page.tsx`, `app/users/[id]/not-found.tsx` | Call `UserController`, then put the view components on the page |
-| Form handlers | `app/users/actions.ts` | Server actions `createUserAction`, `updateUserAction` and `deleteUserAction`, which call `UserController` and then redirect |
-| Routes (API) | `app/api/users/route.ts`, `app/api/users/[id]/route.ts` | Map each HTTP method to an `ApiUserController` function |
-| Layout and static pages | `app/layout.tsx`, `app/page.tsx`, `app/about/page.tsx`, `app/globals.css` | Shared layout, styles and pages that don't use user data |
-| Outside MVC | `app/api/health`, `app/api/swagger`, `app/hello`, `app/sum` | Small routes with no data, so they answer directly |
+`POST /api/users` with a JSON body:
 
-### Route → controller → model → view
+1. **Route** (`app/api/users/route.ts`) receives the request and passes it to the controller.
+2. **Controller** (`ApiUserController.create`) reads the body with `parseBody` and calls the model.
+3. **Model** (`UserModel.create`) validates the data, saves the user and returns it.
+4. **Response:** the controller sends `201 Created` with the new user, or `400` with the field name if validation fails.
 
-**Web pages** (`UserController`):
-
-| Route | Server action | Controller function | Model function | View |
-| --- | --- | --- | --- | --- |
-| `GET /users` | — | `UserController.index` | `UserModel.getAll` | `UserTable`, `UserForm` |
-| `POST /users` (Add a user form) | `createUserAction` | `UserController.create` | `UserModel.create` | Redirects to `/users?created=:id`; errors are shown in `UserForm` |
-| `POST /users` (Delete in a table row) | `deleteUserAction` | `UserController.remove` | `UserModel.remove` | Redirects to `/users` |
-| `GET /users/:id` | — | `UserController.show` | `UserModel.getById` | `UserNav`, `UserDetails`, `DeleteUserButton`; `not-found.tsx` if there is no such user |
-| `POST /users/:id` (Delete) | `deleteUserAction` | `UserController.remove` | `UserModel.remove` | Redirects to `/users` |
-| `GET /users/:id/edit` | — | `UserController.show` | `UserModel.getById` | `UserNav`, `UserForm` filled in; `not-found.tsx` if there is no such user |
-| `POST /users/:id/edit` (Save changes) | `updateUserAction` | `UserController.update` | `UserModel.update` | Redirects to `/users/:id?updated=1`; errors are shown in `UserForm` |
-
-The `POST` rows are form submissions. A Next.js server action posts back to the URL of the page the form is on.
-
-**JSON API** (`ApiUserController`). Here the "view" is the JSON response:
-
-| Route | Controller function | Model function(s) | Response |
-| --- | --- | --- | --- |
-| `GET /api/users` | `ApiUserController.getAll` | `UserModel.getAll` | `200` array of users |
-| `POST /api/users` | `ApiUserController.create` | `UserModel.create` | `201` new user; `400`; `415` |
-| `GET /api/users/:id` | `ApiUserController.getById` | `UserModel.getById` | `200` user; `404` |
-| `PUT /api/users/:id` | `ApiUserController.replace` | `UserModel.getById`, `UserModel.replace` | `200` user; `400`; `404`; `415` |
-| `PATCH /api/users/:id` | `ApiUserController.update` | `UserModel.getById`, `UserModel.update` | `200` user; `400`; `404`; `415` |
-| `DELETE /api/users/:id` | `ApiUserController.remove` | `UserModel.remove` | `204` no body; `404` |
-
-### Request flow 1: creating a user with `POST /api/users` (curl)
-
-```bash
-curl -i -X POST http://localhost:3000/api/users \
-  -H "Content-Type: application/json" \
-  -d '{"fullName":"Zeynep Arslan","email":"zeynep.arslan@example.com","age":23,"school":"Istanbul University"}'
-```
-
-1. **Route:** `app/api/users/route.ts` receives the POST and calls `ApiUserController.create(request)`.
-2. **Controller:** `create` calls `parseBody(request)` from `lib/parseBody.ts`. The `Content-Type` is `application/json`, so the body is read as JSON, and any `id` in it is dropped. The controller then passes the object to `UserModel.create`.
-3. **Model:** `UserModel.create` checks that `fullName`, `email` and `age` are there, that the email looks valid and isn't already used, and that `age` is a positive whole number. It gives the user the next id, adds them to the in-memory list and returns them.
-4. **Response:** the controller sends back `201 Created` with the new user:
-
-   ```json
-   {"id":4,"fullName":"Zeynep Arslan","email":"zeynep.arslan@example.com","age":23,"school":"Istanbul University"}
-   ```
-
-If something is wrong, the model throws a `ValidationError` and the controller turns it into a `400` that names the field, for example `{"error":"\"email\" must be a valid email address.","field":"email"}`. An unsupported `Content-Type` (for example `text/plain`) gets a `415`.
-
-The same request also works as form-data, for example `curl -X POST http://localhost:3000/api/users -F fullName="Can Öz" -F email=can.oz@example.com -F age=25`. `parseBody` turns the text `"25"` into the number `25`.
-
-### Request flow 2: creating a user from the `/users` form
-
-1. **View:** at `http://localhost:3000/users` the user fills in the **Add a user** form (`components/UserForm.tsx`) and clicks **Create user**. The button shows "Saving…" while the form is sending.
-2. **Server action:** the form posts to `createUserAction` in `app/users/actions.ts`, which calls `UserController.create(formData)`.
-3. **Controller:** `UserController.create` uses `formDataToObject` to turn the form fields into an object (empty fields are skipped, `age` becomes a number) and calls `UserModel.create`. A `ValidationError` is caught and returned as `{ ok: false, error, field }`.
-4. **Model:** `UserModel.create` runs the same validation as in flow 1 and saves the user.
-5. **Back to the page:**
-   - **Success:** the action refreshes `/users` (`revalidatePath`) and redirects to `/users?created=4`. The page calls `UserController.index()` again, and `UserTable` highlights the new row with the notice "Added Zeynep Arslan."
-   - **Error:** the action returns the error, the field name and the typed values. `UserForm` shows the message under the wrong field and keeps what the user typed.
+The `/users` web form follows the same path, except a server action (`createUserAction`) and `UserController` replace the route and `ApiUserController`, and the result is shown by `UserForm` and `UserTable`.
 
 ---
+
 ## 🧭 All Routes
 
 ### Web pages
 
-| URL | Method | What it shows or does | CRUD |
-| --- | --- | --- | --- |
-| `/` | GET | Home page with the "Explore" cards | — |
-| `/about` | GET | About the Alumni System | — |
-| `/users` | GET | Table of all users and the "Add a user" form | Read |
-| `/users` | POST (form) | Add a user form → `createUserAction` | Create |
-| `/users` | POST (form) | Delete button in a table row → `deleteUserAction` | Delete |
-| `/users/:id` | GET | One user's details, with Edit and Delete buttons | Read |
-| `/users/:id` | POST (form) | Delete button → `deleteUserAction` | Delete |
-| `/users/:id/edit` | GET | Edit form filled with the user's data | Read |
-| `/users/:id/edit` | POST (form) | Save changes → `updateUserAction` (only the filled-in fields change) | Update |
+| URL | Method | What it shows or does |
+| --- | --- | --- |
+| `/` | GET | Home page with the "Explore" cards |
+| `/about` | GET | About the Alumni System |
+| `/users` | GET | Table of all users and the "Add a user" form |
+| `/users` | POST (form) | Add a user, or delete one from a table row |
+| `/users/:id` | GET | One user's details, with Edit and Delete buttons |
+| `/users/:id` | POST (form) | Delete the user |
+| `/users/:id/edit` | GET | Edit form filled with the user's data |
+| `/users/:id/edit` | POST (form) | Save changes (only the filled-in fields change) |
 
-An unknown id on `/users/:id` or `/users/:id/edit` shows the "User not found" page with a `404` status.
+The `POST` rows are form submissions handled by server actions. An unknown id shows the "User not found" page with a `404` status.
 
 ### JSON API
 
-| URL | Method | What it does | CRUD |
-| --- | --- | --- | --- |
-| `/api/users` | GET | List all users | Read |
-| `/api/users` | POST | Create a user (`fullName`, `email` and `age` required; `school` optional) | Create |
-| `/api/users/:id` | GET | Get one user | Read |
-| `/api/users/:id` | PUT | Replace the whole user (all four fields required) | Update |
-| `/api/users/:id` | PATCH | Change only the fields that are sent | Update |
-| `/api/users/:id` | DELETE | Delete the user | Delete |
+| Method | URL | Request body | Success | Errors |
+| --- | --- | --- | --- | --- |
+| GET | `/api/users` | — | `200` array of users | — |
+| POST | `/api/users` | `fullName`, `email`, `age` (required), `school` (optional) | `201` new user | `400` invalid data, `415` unsupported Content-Type |
+| GET | `/api/users/:id` | — | `200` user | `404` not found |
+| PUT | `/api/users/:id` | `fullName`, `email`, `age`, `school` (all required) | `200` updated user | `400`, `404`, `415` |
+| PATCH | `/api/users/:id` | Any of `fullName`, `email`, `age`, `school` (at least one) | `200` updated user | `400`, `404`, `415` |
+| DELETE | `/api/users/:id` | — | `204` no body | `404` not found |
+
+POST, PUT and PATCH accept `application/json`, `multipart/form-data` and `application/x-www-form-urlencoded`. An `id` sent in the body is always ignored: new ids are generated, and other ids come from the URL. Errors come back as `{ "error": "..." }`, with a `field` when one field is to blame.
 
 ### Other routes
 
@@ -300,6 +200,7 @@ An unknown id on `/users/:id` or `/users/:id/edit` shows the "User not found" pa
 | `/sum/:number1/:number2` | GET | The sum as plain text, for example `/sum/2/3` → `5`; `400` if either one isn't a number |
 
 ---
+
 ## 📚 API Documentation
 
 With the app running (`npm run dev`), open the Swagger UI:
@@ -315,33 +216,18 @@ Swagger groups the routes into four tags:
 - **Health:** `/api/health`.
 - **Examples:** `/hello`, `/hello/{name}` and `/sum/{number1}/{number2}`.
 
-The API routes:
-
-| Method | Path | Request body | Success | Errors |
-| --- | --- | --- | --- | --- |
-| GET | `/api/users` | — | `200` array of users | — |
-| POST | `/api/users` | `fullName`, `email`, `age` (required), `school` (optional) | `201` new user | `400` invalid data, `415` unsupported Content-Type |
-| GET | `/api/users/{id}` | — | `200` user | `404` not found |
-| PUT | `/api/users/{id}` | `fullName`, `email`, `age`, `school` (all required) | `200` updated user | `400`, `404`, `415` |
-| PATCH | `/api/users/{id}` | Any of `fullName`, `email`, `age`, `school` (at least one) | `200` updated user | `400`, `404`, `415` |
-| DELETE | `/api/users/{id}` | — | `204` no body | `404` not found |
-| GET | `/api/health` | — | `200` `{ "status": "ok" }` | — |
-
-POST, PUT and PATCH accept `application/json`, `multipart/form-data` and `application/x-www-form-urlencoded`. An `id` sent in the body is always ignored: new ids are generated, and other ids come from the URL. Errors come back as `{ "error": "..." }`, with a `field` when one field is to blame.
-
 ---
+
 ## ⚠️ Current Limitations
 
-- **No database yet.** Users are kept in memory, so all changes are lost when the server restarts. Every start begins again with the same 3 sample users. The data also lives inside a single server process, so separate server instances wouldn't share it.
-- **No login.** Authentication is deferred for now, so anyone who can open the site can create, edit and delete users, on the pages and through the API.
-- **Only one kind of record.** There is a generic "user" (name, email, age, school). Alumni details such as graduation year, program or current job aren't modelled yet.
-- **Most home page sections are placeholders.** Apart from About, the "Explore" cards are marked "Coming soon", and the matching navigation links only jump to those cards on the home page.
+- **No database yet.** Users are kept in memory, so all changes are lost when the server restarts, and every start begins with the same 3 sample users.
+- **No login.** Authentication is deferred, so anyone who can open the site can create, edit and delete users, on the pages and through the API.
 - **The edit form can't clear a field.** Empty fields keep their old value, so `school` can't be removed from the web form. A `PUT` through the API replaces the whole user.
 - **No search, sorting or paging** on the users list.
 - **No automated tests yet.** Routes have been checked by hand, with curl, Postman and Swagger.
-- **Swagger needs internet**, because Swagger UI is loaded from a CDN.
 
 ---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -368,15 +254,18 @@ Then open:
 | http://localhost:3000/api/swagger | Swagger API documentation |
 | http://localhost:3000/api/health | Health check |
 
-To try the API from a terminal, use the curl example under [Request flow 1](#request-flow-1-creating-a-user-with-post-apiusers-curl).
+To try the API from a terminal, create a user with curl:
+
+```bash
+curl -i -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"fullName":"Zeynep Arslan","email":"zeynep.arslan@example.com","age":23,"school":"Istanbul University"}'
+```
+
+A successful request returns `201 Created` with the new user.
 
 ---
-## 👤 Author
 
-**Anberin Ahmadi**
-Management Information Systems student, Istanbul University
-
----
 ## 🏫 Course Information
 
 - **Course:** Web Programming
@@ -385,6 +274,7 @@ Management Information Systems student, Istanbul University
 - **Evaluation:** The instructor will select the student project that best demonstrates a working website to actually implement and use as the department's official alumni tracking platform.
 
 ---
+
 ## 📄 License
 
 This project was developed for academic purposes as part of the Web Programming course at Istanbul University. It is not licensed for external use, redistribution, or commercial purposes without permission.
