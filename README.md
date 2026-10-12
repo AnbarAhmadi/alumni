@@ -27,6 +27,7 @@ This project is being built incrementally over the semester. Status is updated w
 - [x] **Week 2:** Next.js setup, first routes (`/hello`, `/hello/:name`, `/sum/:a/:b`), home and About pages
 - [x] **Week 3:** Users JSON API with full CRUD (`/api/users`), health check, Swagger UI
 - [x] **Week 4:** MVC refactor (one model, two controllers, view components) and `/users` web pages with list, create, view, edit and delete
+- [x] **Week 4, announcement model:** Announcements built with the same MVC pattern: `AnnouncementModel`, two controllers, a JSON API (`/api/announcements`) and `/announcements` web pages with list, create, view, edit and delete
 
 ### Upcoming
 
@@ -78,6 +79,14 @@ alumni/
 │   │       ├── not-found.tsx             # "User not found" page for an unknown id
 │   │       └── edit/
 │   │           └── page.tsx              # /users/:id/edit: the edit form, filled with the user's data
+│   ├── announcements/                    # The announcements web pages (HTML)
+│   │   ├── page.tsx                      # /announcements: announcements table and the "Add an announcement" form
+│   │   ├── actions.ts                    # Server actions for the forms: create, update and delete
+│   │   └── [id]/                         # [id] is the announcement's id from the URL
+│   │       ├── page.tsx                  # /announcements/:id: one announcement's details, with Edit and Delete
+│   │       ├── not-found.tsx             # "Announcement not found" page for an unknown id
+│   │       └── edit/
+│   │           └── page.tsx              # /announcements/:id/edit: the edit form, filled with the current values
 │   ├── api/                              # JSON API routes
 │   │   ├── health/
 │   │   │   └── route.ts                  # GET /api/health: says the server is running
@@ -85,6 +94,10 @@ alumni/
 │   │   │   ├── route.ts                  # GET and POST /api/users → ApiUserController
 │   │   │   └── [id]/
 │   │   │       └── route.ts              # GET, PUT, PATCH and DELETE /api/users/:id → ApiUserController
+│   │   ├── announcements/
+│   │   │   ├── route.ts                  # GET and POST /api/announcements → ApiAnnouncementController
+│   │   │   └── [id]/
+│   │   │       └── route.ts              # GET, PUT, PATCH and DELETE /api/announcements/:id → ApiAnnouncementController
 │   │   └── swagger/
 │   │       ├── route.ts                  # GET /api/swagger: the Swagger UI page
 │   │       ├── openapi.ts                # The OpenAPI description of every route
@@ -99,16 +112,24 @@ alumni/
 │           └── [number2]/
 │               └── route.ts              # GET /sum/:number1/:number2: adds the two numbers
 ├── models/                               # MODEL
-│   └── User.ts                           # User type, in-memory store with 3 sample users, validation, UserModel CRUD
+│   ├── User.ts                           # User type, in-memory store with 3 sample users, validation, UserModel CRUD
+│   └── Announcement.ts                   # Announcement type, in-memory store with 3 samples, validation, AnnouncementModel CRUD
 ├── controllers/                          # CONTROLLERS
 │   ├── ApiUserController.ts              # For /api/users: calls UserModel and returns JSON with status codes
-│   └── UserController.ts                 # For /users: calls UserModel and returns { ok, data, error, field }
+│   ├── UserController.ts                 # For /users: calls UserModel and returns { ok, data, error, field }
+│   ├── ApiAnnouncementController.ts      # For /api/announcements: calls AnnouncementModel and returns JSON with status codes
+│   └── AnnouncementController.ts         # For /announcements: calls AnnouncementModel and returns { ok, data, error, field }
 ├── components/                           # VIEWS (React components)
 │   ├── UserTable.tsx                     # Table of users with View, Edit and Delete; "Added <name>" notice
 │   ├── UserDetails.tsx                   # One user as label/value rows
 │   ├── UserForm.tsx                      # Create and edit form; shows errors under the right field (client component)
 │   ├── DeleteUserButton.tsx              # Delete button that asks "Delete <name>?" first (client component)
-│   └── UserNav.tsx                       # Links: All users, Details, Edit, + New user
+│   ├── UserNav.tsx                       # Links: All users, Details, Edit, + New user
+│   ├── AnnouncementTable.tsx             # Table of announcements with View, Edit and Delete; "Added" notice
+│   ├── AnnouncementDetails.tsx           # One announcement as label/value rows; formats the createdAt date
+│   ├── AnnouncementForm.tsx              # Create and edit form with a content box; errors under the right field (client component)
+│   ├── DeleteAnnouncementButton.tsx      # Reuses DeleteUserButton with the announcement title in the confirmation
+│   └── AnnouncementNav.tsx               # Links: All announcements, Details, Edit, + New announcement
 ├── lib/                                  # Helpers shared by the controllers
 │   └── parseBody.ts                      # Reads JSON, multipart/form-data and urlencoded bodies; turns age into a number
 ├── eslint.config.mjs                     # ESLint setup (Next.js recommended rules + TypeScript rules)
@@ -156,6 +177,20 @@ Both controllers reach the data only through `UserModel`. When the database is a
 
 The `/users` web form follows the same path, except a server action (`createUserAction`) and `UserController` replace the route and `ApiUserController`, and the result is shown by `UserForm` and `UserTable`.
 
+### Announcements use the same pattern
+
+Announcements (`title`, `content`, optional `author`, and a `createdAt` date set by the server) are built exactly like users, with one model and two controllers:
+
+| Part | Users | Announcements |
+| --- | --- | --- |
+| Model | `models/User.ts` (`UserModel`) | `models/Announcement.ts` (`AnnouncementModel`) |
+| API controller | `ApiUserController` | `ApiAnnouncementController` |
+| Web controller | `UserController` | `AnnouncementController` |
+| Server actions | `app/users/actions.ts` | `app/announcements/actions.ts` |
+| Views | `UserTable`, `UserDetails`, `UserForm`, `DeleteUserButton`, `UserNav` | `AnnouncementTable`, `AnnouncementDetails`, `AnnouncementForm`, `DeleteAnnouncementButton`, `AnnouncementNav` |
+
+Both models have the same functions (`getAll`, `getById`, `create`, `update`, `replace`, `remove`) and throw the same `ValidationError`, so the controllers handle errors the same way.
+
 ---
 
 ## 🧭 All Routes
@@ -172,8 +207,14 @@ The `/users` web form follows the same path, except a server action (`createUser
 | `/users/:id` | POST (form) | Delete the user |
 | `/users/:id/edit` | GET | Edit form filled with the user's data |
 | `/users/:id/edit` | POST (form) | Save changes (only the filled-in fields change) |
+| `/announcements` | GET | Table of all announcements and the "Add an announcement" form |
+| `/announcements` | POST (form) | Add an announcement, or delete one from a table row |
+| `/announcements/:id` | GET | One announcement's details, with Edit and Delete buttons |
+| `/announcements/:id` | POST (form) | Delete the announcement |
+| `/announcements/:id/edit` | GET | Edit form filled with the announcement's data |
+| `/announcements/:id/edit` | POST (form) | Save changes (only the filled-in fields change) |
 
-The `POST` rows are form submissions handled by server actions. An unknown id shows the "User not found" page with a `404` status.
+The `POST` rows are form submissions handled by server actions. An unknown id shows the "User not found" or "Announcement not found" page with a `404` status.
 
 ### JSON API
 
@@ -185,6 +226,14 @@ The `POST` rows are form submissions handled by server actions. An unknown id sh
 | PUT | `/api/users/:id` | `fullName`, `email`, `age`, `school` (all required) | `200` updated user | `400`, `404`, `415` |
 | PATCH | `/api/users/:id` | Any of `fullName`, `email`, `age`, `school` (at least one) | `200` updated user | `400`, `404`, `415` |
 | DELETE | `/api/users/:id` | — | `204` no body | `404` not found |
+| GET | `/api/announcements` | — | `200` array of announcements | — |
+| POST | `/api/announcements` | `title`, `content` (required), `author` (optional) | `201` new announcement | `400` invalid data, `415` unsupported Content-Type |
+| GET | `/api/announcements/:id` | — | `200` announcement | `404` not found |
+| PUT | `/api/announcements/:id` | `title`, `content` (required), `author` (optional; removed if not sent) | `200` updated announcement | `400`, `404`, `415` |
+| PATCH | `/api/announcements/:id` | Any of `title`, `content`, `author` (at least one) | `200` updated announcement | `400`, `404`, `415` |
+| DELETE | `/api/announcements/:id` | — | `204` no body | `404` not found |
+
+An announcement's `createdAt` is always set by the server, and a `createdAt` sent in the body is ignored.
 
 POST, PUT and PATCH accept `application/json`, `multipart/form-data` and `application/x-www-form-urlencoded`. An `id` sent in the body is always ignored: new ids are generated, and other ids come from the URL. Errors come back as `{ "error": "..." }`, with a `field` when one field is to blame.
 
@@ -209,10 +258,12 @@ With the app running (`npm run dev`), open the Swagger UI:
 
 The raw OpenAPI spec is at http://localhost:3000/api/swagger/openapi.json. Swagger UI is loaded from the unpkg CDN, so the page needs an internet connection.
 
-Swagger groups the routes into four tags:
+Swagger groups the routes into six tags:
 
 - **Users:** the JSON API. Each operation shows its request body (as JSON or form-data), its response codes and examples. Use **Try it out** to send real requests from the browser.
 - **Users (views):** the `/users` HTML pages and their forms. The form submissions are server actions, so they are documented but can't be sent with Try it out.
+- **Announcements:** the announcements JSON API, documented the same way as Users.
+- **Announcements (views):** the `/announcements` HTML pages and their forms.
 - **Health:** `/api/health`.
 - **Examples:** `/hello`, `/hello/{name}` and `/sum/{number1}/{number2}`.
 
