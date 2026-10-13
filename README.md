@@ -26,12 +26,11 @@ This project is being built incrementally over the semester. Status is updated w
 
 - [x] **Week 2:** Next.js setup, first routes (`/hello`, `/hello/:name`, `/sum/:a/:b`), home and About pages
 - [x] **Week 3:** Users JSON API with full CRUD (`/api/users`), health check, Swagger UI
-- [x] **Week 4:** MVC refactor (one model, two controllers, view components) and `/users` web pages with list, create, view, edit and delete
-- [x] **Week 4, announcement model:** Announcements built with the same MVC pattern: `AnnouncementModel`, two controllers, a JSON API (`/api/announcements`) and `/announcements` web pages with list, create, view, edit and delete
+- [x] **Week 4:** MVC refactor (one model, two controllers, view components), `/users` web pages with list, create, view, edit and delete, and an Announcements module (model, two controllers, routes, `/announcements` pages)
 
 ### Upcoming
 
-- [ ] **Database:** Supabase (hosted PostgreSQL) with Prisma, replacing the in-memory store in `models/User.ts`
+- [ ] **Database:** Supabase (hosted PostgreSQL) with Prisma, replacing the in-memory stores of users and announcements in `models/User.ts` and `models/Announcement.ts`
 - [ ] **Alumni records:** graduation details and current job, with their own pages and API routes
 - [ ] **Alumni Directory:** search graduates by year, program, company or city
 - [ ] **My Profile:** graduates keep their own contact and career details up to date
@@ -51,7 +50,7 @@ This project is being built incrementally over the semester. Status is updated w
 | Framework | Next.js 16 (App Router), React 19 | Pages, API routes and server actions all live in `app/` |
 | Runtime | Node.js | Developed with Node.js 24 |
 | Architecture | MVC | One model, two controllers, React view components |
-| Data storage | In memory (`models/User.ts`) | No database yet; data resets when the server restarts |
+| Data storage | In memory (`models/User.ts` and `models/Announcement.ts`) | No database yet; data resets when the server restarts |
 | API documentation | OpenAPI 3.0 + Swagger UI | The spec is written in `app/api/swagger/openapi.ts`; Swagger UI is loaded from the unpkg CDN, so it needs an internet connection |
 | Code quality | ESLint 9 with `eslint-config-next` | Next.js core-web-vitals and TypeScript rules |
 | Package manager | npm | |
@@ -271,7 +270,7 @@ Swagger groups the routes into six tags:
 
 ## ⚠️ Current Limitations
 
-- **No database yet.** Users are kept in memory, so all changes are lost when the server restarts, and every start begins with the same 3 sample users.
+- **No database yet.** Users and announcements are kept in memory, so all changes are lost when the server restarts, and every start begins with the same sample data (3 users and 3 announcements).
 - **No login.** Authentication is deferred, so anyone who can open the site can create, edit and delete users, on the pages and through the API.
 - **The edit form can't clear a field.** Empty fields keep their old value, so `school` can't be removed from the web form. A `PUT` through the API replaces the whole user.
 - **No search, sorting or paging** on the users list.
@@ -302,6 +301,8 @@ Then open:
 | http://localhost:3000 | Home page |
 | http://localhost:3000/users | Users pages: list, create, view, edit, delete |
 | http://localhost:3000/api/users | The users as JSON |
+| http://localhost:3000/announcements | Announcements pages: list, create, view, edit, delete |
+| http://localhost:3000/api/announcements | The announcements as JSON |
 | http://localhost:3000/api/swagger | Swagger API documentation |
 | http://localhost:3000/api/health | Health check |
 
