@@ -51,6 +51,7 @@ This project is being built incrementally over the semester. Status is updated w
 | Runtime | Node.js | Developed with Node.js 24 |
 | Architecture | MVC | One model, two controllers, React view components |
 | Data storage | In memory (`models/User.ts` and `models/Announcement.ts`) | No database yet; data resets when the server restarts |
+| Database (planned) | Supabase (PostgreSQL) with Prisma | Not added yet; it will replace the in-memory data (see Upcoming) |
 | API documentation | OpenAPI 3.0 + Swagger UI | The spec is written in `app/api/swagger/openapi.ts`; Swagger UI is loaded from the unpkg CDN, so it needs an internet connection |
 | Code quality | ESLint 9 with `eslint-config-next` | Next.js core-web-vitals and TypeScript rules |
 | Package manager | npm | |
