@@ -4,6 +4,8 @@
 
 > A full-stack web platform that keeps universities connected to their graduates, built from scratch as a semester-long project for the Web Programming course.
 
+Data design: see [ddd.md](ddd.md)
+
 ---
 
 ## 📖 About
@@ -141,6 +143,7 @@ alumni/
 ├── .gitignore                            # Keeps node_modules, .next, .env files and local Postman files out of Git
 ├── AGENTS.md                             # Notes for AI coding tools about this Next.js version (written by next dev)
 ├── CLAUDE.md                             # Points to AGENTS.md
+├── ddd.md                                # Data design: data dictionary, types, validation, ER diagram, planned database
 └── README.md                             # This file
 ```
 
