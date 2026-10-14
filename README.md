@@ -55,6 +55,7 @@ This project is being built incrementally over the semester. Status is updated w
 | API documentation | OpenAPI 3.0 + Swagger UI | The spec is written in `app/api/swagger/openapi.ts`; Swagger UI is loaded from the unpkg CDN, so it needs an internet connection |
 | Code quality | ESLint 9 with `eslint-config-next` | Next.js core-web-vitals and TypeScript rules |
 | Package manager | npm | |
+| Containerization | Docker and Docker Compose | Runs the app in a container |
 | Version control | Git and GitHub | One commit per task, with the week in the message (for example "Week 4: ...") |
 
 ---
@@ -316,6 +317,34 @@ curl -i -X POST http://localhost:3000/api/users \
 ```
 
 A successful request returns `201 Created` with the new user.
+
+### Running with Docker
+
+With Docker Desktop running, build and start the app in a container:
+
+```bash
+docker compose up --build
+```
+
+Then open http://localhost:3000 (the same URLs as above work). To stop and remove the container:
+
+```bash
+docker compose down
+```
+
+The image is a multi-stage build on `node:24-alpine` that runs the Next.js standalone server as the non-root `node` user (see `Dockerfile` and `docker-compose.yml`).
+
+### Forgetting test
+
+1. Start the app with `docker compose up -d --build` and check that `/api/announcements` has the 3 sample announcements.
+2. Create a record: `curl -X POST http://localhost:3000/api/announcements -H "Content-Type: application/json" -d '{"title":"Forgetting test","content":"Do I survive a restart?"}'` (returns `201`).
+3. Check `/api/announcements` again: there are now 4 announcements.
+4. Run `docker compose down`, then `docker compose up -d`.
+5. Check `/api/announcements` once more.
+
+**Result:** the "Forgetting test" announcement was gone, and only the 3 sample announcements were left. The same happened with a user created through `/api/users`: 4 users before the restart, 3 after.
+
+**Why:** the data lives only in the app's memory inside the container, and that memory is erased when the container stops. A database with a Docker volume will be added later so data survives restarts.
 
 ---
 
