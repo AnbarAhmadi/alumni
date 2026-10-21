@@ -27,12 +27,12 @@ function handleError(err: unknown) {
 
 // GET /api/announcements → 200
 export async function getAll() {
-  return NextResponse.json(AnnouncementModel.getAll());
+  return NextResponse.json(await AnnouncementModel.getAll());
 }
 
 // GET /api/announcements/[id] → 200 | 404
 export async function getById(_request: Request, id: string) {
-  const announcement = AnnouncementModel.getById(toId(id));
+  const announcement = await AnnouncementModel.getById(toId(id));
   if (!announcement) return notFound(id);
 
   return NextResponse.json(announcement);
@@ -41,7 +41,7 @@ export async function getById(_request: Request, id: string) {
 // POST /api/announcements → 201 | 400 | 415
 export async function create(request: Request) {
   try {
-    const announcement = AnnouncementModel.create(await parseBody(request));
+    const announcement = await AnnouncementModel.create(await parseBody(request));
     return NextResponse.json(announcement, { status: 201 });
   } catch (err) {
     return handleError(err);
@@ -50,10 +50,10 @@ export async function create(request: Request) {
 
 // PATCH /api/announcements/[id]: only the fields sent are changed → 200 | 400 | 404 | 415
 export async function update(request: Request, id: string) {
-  if (!AnnouncementModel.getById(toId(id))) return notFound(id);
+  if (!(await AnnouncementModel.getById(toId(id)))) return notFound(id);
 
   try {
-    const announcement = AnnouncementModel.update(toId(id), await parseBody(request));
+    const announcement = await AnnouncementModel.update(toId(id), await parseBody(request));
     return announcement ? NextResponse.json(announcement) : notFound(id);
   } catch (err) {
     return handleError(err);
@@ -62,10 +62,10 @@ export async function update(request: Request, id: string) {
 
 // PUT /api/announcements/[id]: title and content are required → 200 | 400 | 404 | 415
 export async function replace(request: Request, id: string) {
-  if (!AnnouncementModel.getById(toId(id))) return notFound(id);
+  if (!(await AnnouncementModel.getById(toId(id)))) return notFound(id);
 
   try {
-    const announcement = AnnouncementModel.replace(toId(id), await parseBody(request));
+    const announcement = await AnnouncementModel.replace(toId(id), await parseBody(request));
     return announcement ? NextResponse.json(announcement) : notFound(id);
   } catch (err) {
     return handleError(err);
@@ -74,7 +74,7 @@ export async function replace(request: Request, id: string) {
 
 // DELETE /api/announcements/[id] → 204 (no body) | 404
 export async function remove(_request: Request, id: string) {
-  if (!AnnouncementModel.remove(toId(id))) return notFound(id);
+  if (!(await AnnouncementModel.remove(toId(id)))) return notFound(id);
 
   return new NextResponse(null, { status: 204 });
 }

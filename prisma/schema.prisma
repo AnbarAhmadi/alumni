@@ -1,0 +1,40 @@
+// Database tables for the Alumni Tracking System (PostgreSQL in Docker).
+// The fields follow the design in ddd.md, which is the source of truth.
+// The app does not use these tables yet: it still keeps users and announcements
+// in memory (models/User.ts and models/Announcement.ts), whose fields differ
+// (see "Differences between this design and the current code" in ddd.md).
+
+// Prisma Client, generated into generated/prisma (git-ignored).
+// Not imported anywhere in the app yet.
+generator client {
+  provider               = "prisma-client"
+  output                 = "../generated/prisma"
+  // .mts files with .mts imports, so Node 24 can run the seed directly (no tsx needed)
+  generatedFileExtension = "mts"
+  importFileExtension    = "mts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             Int     @id @default(autoincrement())
+  fullName       String
+  email          String  @unique
+  age            Int
+  school         String?
+  isAlumni       Boolean @default(false)
+  graduationYear Int?
+
+  @@map("users")
+}
+
+model Announcement {
+  id       Int      @id @default(autoincrement())
+  title    String
+  message  String
+  postedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@map("announcements")
+}

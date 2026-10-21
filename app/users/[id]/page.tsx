@@ -17,7 +17,7 @@ export default async function UserPage({ params, searchParams }: PageProps<"/use
   await connection();
   const { id } = await params;
   const { updated } = await searchParams;
-  const { ok, data: user } = UserController.show(id);
+  const { ok, data: user } = await UserController.show(id);
   if (!ok) notFound();
 
   return (

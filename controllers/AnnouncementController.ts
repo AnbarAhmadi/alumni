@@ -12,9 +12,9 @@ function toId(id: string | number) {
 }
 
 // Runs a model call and turns a ValidationError into { ok: false, error, field }.
-function attempt<T>(action: () => T | null, notFoundMessage = "Not found."): Result<T> {
+async function attempt<T>(action: () => Promise<T | null>, notFoundMessage = "Not found."): Promise<Result<T>> {
   try {
-    const data = action();
+    const data = await action();
     if (data === null) return { ok: false, error: notFoundMessage };
     return { ok: true, data };
   } catch (err) {
@@ -23,29 +23,29 @@ function attempt<T>(action: () => T | null, notFoundMessage = "Not found."): Res
   }
 }
 
-export function index(): Result<Announcement[]> {
-  return { ok: true, data: AnnouncementModel.getAll() };
+export async function index(): Promise<Result<Announcement[]>> {
+  return { ok: true, data: await AnnouncementModel.getAll() };
 }
 
-export function show(id: string | number): Result<Announcement> {
-  const announcement = AnnouncementModel.getById(toId(id));
+export async function show(id: string | number): Promise<Result<Announcement>> {
+  const announcement = await AnnouncementModel.getById(toId(id));
   if (!announcement) return { ok: false, error: `Announcement "${id}" not found.` };
   return { ok: true, data: announcement };
 }
 
-export function create(formData: FormData): Result<Announcement> {
+export async function create(formData: FormData): Promise<Result<Announcement>> {
   return attempt(() => AnnouncementModel.create(formDataToObject(formData)));
 }
 
 // The edit form sends the fields to change; empty fields are left as they were.
-export function update(id: string | number, formData: FormData): Result<Announcement> {
+export async function update(id: string | number, formData: FormData): Promise<Result<Announcement>> {
   return attempt(
     () => AnnouncementModel.update(toId(id), formDataToObject(formData)),
     `Announcement "${id}" not found.`,
   );
 }
 
-export function remove(id: string | number): Result<null> {
-  if (!AnnouncementModel.remove(toId(id))) return { ok: false, error: `Announcement "${id}" not found.` };
+export async function remove(id: string | number): Promise<Result<null>> {
+  if (!(await AnnouncementModel.remove(toId(id)))) return { ok: false, error: `Announcement "${id}" not found.` };
   return { ok: true, data: null };
 }

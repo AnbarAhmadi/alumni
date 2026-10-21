@@ -18,7 +18,7 @@ export async function createUserAction(
   _state: UserFormState,
   formData: FormData,
 ): Promise<UserFormState> {
-  const result = UserController.create(formData);
+  const result = await UserController.create(formData);
   if (!result.ok) return { error: result.error, field: result.field, values: typedValues(formData) };
 
   revalidatePath("/users");
@@ -30,7 +30,7 @@ export async function updateUserAction(
   _state: UserFormState,
   formData: FormData,
 ): Promise<UserFormState> {
-  const result = UserController.update(id, formData);
+  const result = await UserController.update(id, formData);
   if (!result.ok) return { error: result.error, field: result.field, values: typedValues(formData) };
 
   revalidatePath("/users");
@@ -38,7 +38,7 @@ export async function updateUserAction(
 }
 
 export async function deleteUserAction(id: number) {
-  UserController.remove(id);
+  await UserController.remove(id);
   revalidatePath("/users");
   redirect("/users");
 }

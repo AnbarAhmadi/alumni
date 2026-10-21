@@ -1,9 +1,10 @@
-// User model: the User type, the in-memory store, the validation rules and the
-// CRUD functions. It has no HTTP or Next.js code, so it works anywhere.
+// User model: the User type, the validation rules and the CRUD functions.
+// The data lives in the PostgreSQL "users" table and is read and written
+// through Prisma Client (lib/prisma.ts). It has no HTTP or Next.js code.
 //
-// The data lives in memory for now. To move to a database (e.g. Prisma) later,
-// only the bodies of the UserModel functions below need to change; the
-// controllers call the same functions and don't need to change.
+// The table also has isAlumni and graduationYear (see ddd.md). The app doesn't
+// use them yet: new users get the database defaults (false and empty).
+import { prisma } from "@/lib/prisma";
 
 export type User = {
   id: number;
@@ -28,25 +29,54 @@ export class ValidationError extends Error {
   }
 }
 
-// ---------- In-memory store ----------
+// Thrown when the database refuses a value because it must be unique
+// (today only email, through the unique index users_email_key). The API answers 409.
+export class ConflictError extends Error {
+  field?: string;
 
-type Store = { users: User[]; nextId: number };
+  constructor(message: string, field?: string) {
+    super(message);
+    this.name = "ConflictError";
+    this.field = field;
+  }
+}
 
-// Kept on globalThis so Next.js dev hot reloads (and separately bundled
-// routes) all share one array instead of starting from scratch.
-const globalStore = globalThis as typeof globalThis & { userModelStore?: Store };
+// ---------- Database rows ----------
 
-const store: Store = (globalStore.userModelStore ??= {
-  users: [
-    { id: 1, fullName: "Ayşe Yılmaz", email: "ayse.yilmaz@example.com", age: 24, school: "Istanbul University" },
-    { id: 2, fullName: "Mehmet Kaya", email: "mehmet.kaya@example.com", age: 27, school: "Boğaziçi University" },
-    { id: 3, fullName: "Elif Demir", email: "elif.demir@example.com", age: 22 },
-  ],
-  nextId: 4,
-});
+// Only these columns are read, in the same order as the User type.
+const SELECT = { id: true, fullName: true, email: true, age: true, school: true } as const;
 
-function indexOf(id: number) {
-  return store.users.findIndex((u) => u.id === id);
+type Row = { id: number; fullName: string; email: string; age: number; school: string | null };
+
+// An empty school is left out of the result (never null), as before.
+function toUser(row: Row): User {
+  const { school, ...rest } = row;
+  return school === null ? rest : { ...rest, school };
+}
+
+// Ids that can't exist in an integer column match no user (instead of a database error).
+function isValidId(id: number) {
+  return Number.isInteger(id) && id > 0 && id <= 2_147_483_647;
+}
+
+// Prisma reports a unique-index violation as P2002. With the pg adapter the index
+// name is in meta.driverAdapterError.cause.constraint.index; without it, in meta.target.
+type UniqueError = {
+  code?: string;
+  meta?: { target?: unknown; driverAdapterError?: { cause?: { constraint?: { index?: string; fields?: string[] } } } };
+};
+
+function isUniqueEmailError(err: unknown) {
+  if (typeof err !== "object" || err === null) return false;
+  const { code, meta } = err as UniqueError;
+  if (code !== "P2002") return false;
+  const constraint = meta?.driverAdapterError?.cause?.constraint;
+  const target = meta?.target;
+  return (
+    constraint?.index === "users_email_key" ||
+    constraint?.fields?.includes("email") === true ||
+    (Array.isArray(target) ? target.includes("email") : target === "users_email_key")
+  );
 }
 
 // ---------- Validation ----------
@@ -55,13 +85,9 @@ const FIELDS = ["fullName", "email", "age", "school"] as const;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Checks the fields in `input`. `required` lists fields that must be present;
-// any other field is checked only if it was sent. `ignoreId` lets a user keep
-// their own email when updating. Returns only the known, cleaned fields.
-function validate(
-  input: UserInput,
-  required: readonly (keyof UserFields)[],
-  ignoreId?: number,
-): Partial<UserFields> {
+// any other field is checked only if it was sent. Returns only the known, cleaned fields.
+// Whether an email is already taken is decided by the database (see write below).
+function validate(input: UserInput, required: readonly (keyof UserFields)[]): Partial<UserFields> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new ValidationError("Request body must be an object.");
   }
@@ -86,11 +112,9 @@ function validate(
     if (!EMAIL_PATTERN.test(email)) {
       throw new ValidationError('"email" must be a valid email address.', "email");
     }
-    const taken = store.users.some(
-      (u) => u.id !== ignoreId && u.email.toLowerCase() === email.toLowerCase(),
-    );
-    if (taken) throw new ValidationError('"email" is already used by another user.', "email");
-    data.email = email;
+    // Stored in lowercase, so the case-sensitive unique index also treats
+    // Ayse@Example.com and ayse@example.com as the same email.
+    data.email = email.toLowerCase();
   }
 
   if (input.age !== undefined) {
@@ -107,55 +131,63 @@ function validate(
   return ordered;
 }
 
+// Runs a write and turns the database's duplicate-email error into a ConflictError.
+async function write<T>(action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (err) {
+    if (isUniqueEmailError(err)) throw new ConflictError('"email" is already used by another user.', "email");
+    throw err;
+  }
+}
+
 // ---------- CRUD ----------
 
 export const UserModel = {
-  getAll(): User[] {
-    return store.users;
+  async getAll(): Promise<User[]> {
+    const rows = await prisma.user.findMany({ select: SELECT, orderBy: { id: "asc" } });
+    return rows.map(toUser);
   },
 
-  getById(id: number): User | null {
-    return store.users[indexOf(id)] ?? null;
+  async getById(id: number): Promise<User | null> {
+    if (!isValidId(id)) return null;
+    const row = await prisma.user.findUnique({ where: { id }, select: SELECT });
+    return row ? toUser(row) : null;
   },
 
-  // fullName, email and age are required; school is optional. The id is generated.
-  create(data: UserInput): User {
+  // fullName, email and age are required; school is optional. The id is generated by the database.
+  async create(data: UserInput): Promise<User> {
     const fields = validate(data, ["fullName", "email", "age"]) as UserFields;
-    const user: User = { id: store.nextId++, ...fields };
-    store.users.push(user);
-    return user;
+    const row = await write(() => prisma.user.create({ data: fields, select: SELECT }));
+    return toUser(row);
   },
 
   // Changes only the fields sent. Returns null if no user has this id.
-  update(id: number, partialData: UserInput): User | null {
-    const index = indexOf(id);
-    if (index === -1) return null;
+  async update(id: number, partialData: UserInput): Promise<User | null> {
+    if (!(await this.getById(id))) return null;
 
-    const fields = validate(partialData, [], id);
+    const fields = validate(partialData, []);
     if (Object.keys(fields).length === 0) {
       throw new ValidationError(`Send at least one of: ${FIELDS.join(", ")}.`);
     }
 
-    store.users[index] = { ...store.users[index], ...fields };
-    return store.users[index];
+    const row = await write(() => prisma.user.update({ where: { id }, data: fields, select: SELECT }));
+    return toUser(row);
   },
 
   // Replaces the whole user, so every field is required. Returns null if no user has this id.
-  replace(id: number, fullData: UserInput): User | null {
-    const index = indexOf(id);
-    if (index === -1) return null;
+  async replace(id: number, fullData: UserInput): Promise<User | null> {
+    if (!(await this.getById(id))) return null;
 
-    const fields = validate(fullData, FIELDS, id) as UserFields;
-    store.users[index] = { id, ...fields };
-    return store.users[index];
+    const fields = validate(fullData, FIELDS) as UserFields;
+    const row = await write(() => prisma.user.update({ where: { id }, data: fields, select: SELECT }));
+    return toUser(row);
   },
 
   // Returns false if no user has this id.
-  remove(id: number): boolean {
-    const index = indexOf(id);
-    if (index === -1) return false;
-
-    store.users.splice(index, 1);
-    return true;
+  async remove(id: number): Promise<boolean> {
+    if (!isValidId(id)) return false;
+    const { count } = await prisma.user.deleteMany({ where: { id } });
+    return count > 0;
   },
 };

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default async function EditAnnouncementPage({ params }: PageProps<"/announcements/[id]/edit">) {
   await connection();
   const { id } = await params;
-  const { ok, data: announcement } = AnnouncementController.show(id);
+  const { ok, data: announcement } = await AnnouncementController.show(id);
   if (!ok) notFound();
 
   return (

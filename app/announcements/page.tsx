@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default async function AnnouncementsPage({ searchParams }: PageProps<"/announcements">) {
   // Announcements live in memory and change at runtime, so render on every request.
   await connection();
-  const { data: announcements } = AnnouncementController.index();
+  const { data: announcements } = await AnnouncementController.index();
   const { created } = await searchParams;
 
   return (

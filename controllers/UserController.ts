@@ -1,7 +1,7 @@
 // Web controller: used by the /users pages and their server actions.
 // Returns plain data or a result object; no JSON or HTTP response code.
 // All data access goes through UserModel.
-import { UserModel, ValidationError, type User } from "@/models/User";
+import { ConflictError, UserModel, ValidationError, type User } from "@/models/User";
 import { formDataToObject } from "@/lib/parseBody";
 
 export type Result<T> = {
@@ -15,41 +15,41 @@ function toId(id: string | number) {
   return typeof id === "number" ? id : /^\d+$/.test(id) ? Number(id) : NaN;
 }
 
-// Runs a model call and turns a ValidationError into { ok: false, error, field }.
-function attempt<T>(action: () => T | null, notFoundMessage = "Not found."): Result<T> {
+// Runs a model call and turns a ValidationError or ConflictError (duplicate email) into { ok: false, error, field }.
+async function attempt<T>(action: () => Promise<T | null>, notFoundMessage = "Not found."): Promise<Result<T>> {
   try {
-    const data = action();
+    const data = await action();
     if (data === null) return { ok: false, error: notFoundMessage };
     return { ok: true, data };
   } catch (err) {
-    if (err instanceof ValidationError) return { ok: false, error: err.message, field: err.field };
+    if (err instanceof ValidationError || err instanceof ConflictError) return { ok: false, error: err.message, field: err.field };
     throw err;
   }
 }
 
-export function index(): Result<User[]> {
-  return { ok: true, data: UserModel.getAll() };
+export async function index(): Promise<Result<User[]>> {
+  return { ok: true, data: await UserModel.getAll() };
 }
 
-export function show(id: string | number): Result<User> {
-  const user = UserModel.getById(toId(id));
+export async function show(id: string | number): Promise<Result<User>> {
+  const user = await UserModel.getById(toId(id));
   if (!user) return { ok: false, error: `User "${id}" not found.` };
   return { ok: true, data: user };
 }
 
-export function create(formData: FormData): Result<User> {
+export async function create(formData: FormData): Promise<Result<User>> {
   return attempt(() => UserModel.create(formDataToObject(formData)));
 }
 
 // The edit form sends the fields to change; empty fields are left as they were.
-export function update(id: string | number, formData: FormData): Result<User> {
+export async function update(id: string | number, formData: FormData): Promise<Result<User>> {
   return attempt(
     () => UserModel.update(toId(id), formDataToObject(formData)),
     `User "${id}" not found.`,
   );
 }
 
-export function remove(id: string | number): Result<null> {
-  if (!UserModel.remove(toId(id))) return { ok: false, error: `User "${id}" not found.` };
+export async function remove(id: string | number): Promise<Result<null>> {
+  if (!(await UserModel.remove(toId(id)))) return { ok: false, error: `User "${id}" not found.` };
   return { ok: true, data: null };
 }

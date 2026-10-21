@@ -60,10 +60,14 @@ const unsupportedType = errorResponse("The Content-Type is not JSON or form data
   ],
 });
 
+// 409: the email is already used. The database's unique index decides; emails are stored in lowercase.
+const emailConflict = errorResponse("Another user already has this email (compared in lowercase).", {
+  duplicateEmail: ['"email" is already used by another user.', "email"],
+});
+
 const validationErrors = {
   missingField: ['"email" is required.', "email"] as [string, string],
   invalidEmail: ['"email" must be a valid email address.', "email"] as [string, string],
-  duplicateEmail: ['"email" is already used by another user.', "email"] as [string, string],
   invalidAge: ['"age" must be a positive whole number.', "age"] as [string, string],
   invalidJson: ["Request body must be valid JSON."] as [string],
 };
@@ -101,8 +105,8 @@ export const openApiSpec = {
     title: "Alumni System API",
     version: "1.0.0",
     description:
-      "Users and announcements are kept in memory (no database) and reset when the server restarts. " +
-      "The server starts with 3 sample users and 3 sample announcements.\n\n" +
+      "Users and announcements are stored in PostgreSQL (through Prisma), so they are kept when the server restarts. " +
+      "For development, `npx prisma db seed` fills the database with 20 fake users and 5 fake announcements.\n\n" +
       "Write requests (POST, PUT, PATCH) accept `application/json`, `multipart/form-data` or `application/x-www-form-urlencoded`. " +
       "Any `id` in the body is ignored: ids are generated on create and taken from the URL otherwise. " +
       "An announcement's `createdAt` is always set by the server.",
@@ -142,7 +146,7 @@ export const openApiSpec = {
       post: {
         tags: ["Users"],
         summary: "Create a user",
-        description: "fullName, email and age are required; school is optional. Emails must be unique (ignoring case).",
+        description: "fullName, email and age are required; school is optional. Emails are stored in lowercase and must be unique: a duplicate gives 409.",
         requestBody: writeBody("UserCreate", {
           fullName: "Ayşe Yılmaz",
           email: "ayse.yilmaz@example.com",
@@ -152,6 +156,7 @@ export const openApiSpec = {
         responses: {
           201: { description: "The created user.", content: json(ref("User"), exampleUser) },
           400: errorResponse("The body can't be read, or a field is missing or invalid.", validationErrors),
+          409: emailConflict,
           415: unsupportedType,
         },
       },
@@ -186,6 +191,7 @@ export const openApiSpec = {
             missingField: ['"school" is required.', "school"],
           }),
           404: notFound,
+          409: emailConflict,
           415: unsupportedType,
         },
       },
@@ -199,9 +205,9 @@ export const openApiSpec = {
           400: errorResponse("The body can't be read, no field was sent, or a field is invalid.", {
             noFields: ["Send at least one of: fullName, email, age, school."],
             invalidAge: validationErrors.invalidAge,
-            duplicateEmail: validationErrors.duplicateEmail,
           }),
           404: notFound,
+          409: emailConflict,
           415: unsupportedType,
         },
       },
@@ -590,7 +596,7 @@ export const openApiSpec = {
         required: ["fullName", "email", "age"],
         properties: {
           fullName: { type: "string" },
-          email: { type: "string", format: "email", description: "Must be unique (ignoring case)." },
+          email: { type: "string", format: "email", description: "Stored in lowercase; must be unique (a duplicate gives 409)." },
           age: { type: "integer", minimum: 1 },
           school: { type: "string" },
         },
@@ -600,7 +606,7 @@ export const openApiSpec = {
         required: ["fullName", "email", "age", "school"],
         properties: {
           fullName: { type: "string" },
-          email: { type: "string", format: "email", description: "Must be unique (ignoring case)." },
+          email: { type: "string", format: "email", description: "Stored in lowercase; must be unique (a duplicate gives 409)." },
           age: { type: "integer", minimum: 1 },
           school: { type: "string" },
         },
@@ -610,7 +616,7 @@ export const openApiSpec = {
         minProperties: 1,
         properties: {
           fullName: { type: "string" },
-          email: { type: "string", format: "email", description: "Must be unique (ignoring case)." },
+          email: { type: "string", format: "email", description: "Stored in lowercase; must be unique (a duplicate gives 409)." },
           age: { type: "integer", minimum: 1 },
           school: { type: "string" },
         },

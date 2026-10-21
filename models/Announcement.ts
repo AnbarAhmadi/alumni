@@ -1,10 +1,13 @@
-// Announcement model: the Announcement type, the in-memory store, the
-// validation rules and the CRUD functions. It has no HTTP or Next.js code,
-// so it works anywhere.
+// Announcement model: the Announcement type, the validation rules and the CRUD
+// functions. The data lives in the PostgreSQL "announcements" table and is read
+// and written through Prisma Client (lib/prisma.ts). It has no HTTP or Next.js code.
 //
-// The data lives in memory for now, like the User model. To move to a
-// database later, only the bodies of the AnnouncementModel functions below
-// need to change.
+// The app keeps its own field names; the database columns are named as in ddd.md:
+//   content   <-> message
+//   createdAt <-> postedAt (an ISO string in the app, timestamptz in the database)
+//   author    -> the table has no author column, so it is never stored and
+//                never returned. It is still validated when sent, as before.
+import { prisma } from "@/lib/prisma";
 import { ValidationError } from "./User";
 
 export { ValidationError };
@@ -14,7 +17,7 @@ export type Announcement = {
   title: string;
   content: string;
   author?: string;
-  createdAt: string; // ISO date, set when the announcement is created
+  createdAt: string; // ISO date, set by the database when the announcement is created
 };
 
 // The fields a client may send. id and createdAt are always set by the server.
@@ -23,42 +26,27 @@ export type AnnouncementFields = Pick<Announcement, "title" | "content" | "autho
 // Raw input from a request body or form. Unknown keys (including "id" and "createdAt") are ignored.
 export type AnnouncementInput = Record<string, unknown>;
 
-// ---------- In-memory store ----------
+// ---------- Database rows ----------
 
-type Store = { announcements: Announcement[]; nextId: number };
+const SELECT = { id: true, title: true, message: true, postedAt: true } as const;
 
-// Kept on globalThis so Next.js dev hot reloads (and separately bundled
-// routes) all share one array instead of starting from scratch.
-const globalStore = globalThis as typeof globalThis & { announcementModelStore?: Store };
+type Row = { id: number; title: string; message: string; postedAt: Date };
 
-const store: Store = (globalStore.announcementModelStore ??= {
-  announcements: [
-    {
-      id: 1,
-      title: "Welcome to the Alumni Tracking System",
-      content: "The MIS department now has one place to stay in touch with its graduates. Please keep your details up to date.",
-      author: "MIS Department",
-      createdAt: "2026-09-22T09:00:00.000Z",
-    },
-    {
-      id: 2,
-      title: "Alumni meetup in October",
-      content: "Graduates and current students are invited to an evening of talks and networking on campus.",
-      author: "Alumni Office",
-      createdAt: "2026-09-30T12:30:00.000Z",
-    },
-    {
-      id: 3,
-      title: "Mentors wanted",
-      content: "We are looking for graduates who would like to mentor a current MIS student this semester.",
-      createdAt: "2026-10-07T08:15:00.000Z",
-    },
-  ],
-  nextId: 4,
-});
+function toAnnouncement(row: Row): Announcement {
+  return { id: row.id, title: row.title, content: row.message, createdAt: row.postedAt.toISOString() };
+}
 
-function indexOf(id: number) {
-  return store.announcements.findIndex((a) => a.id === id);
+// The fields the app uses, renamed to the database columns. author is dropped.
+function toColumns(fields: Partial<AnnouncementFields>) {
+  return {
+    ...(fields.title !== undefined && { title: fields.title }),
+    ...(fields.content !== undefined && { message: fields.content }),
+  };
+}
+
+// Ids that can't exist in an integer column match no announcement (instead of a database error).
+function isValidId(id: number) {
+  return Number.isInteger(id) && id > 0 && id <= 2_147_483_647;
 }
 
 // ---------- Validation ----------
@@ -96,59 +84,64 @@ function validate(
 // ---------- CRUD ----------
 
 export const AnnouncementModel = {
-  getAll(): Announcement[] {
-    return store.announcements;
+  async getAll(): Promise<Announcement[]> {
+    const rows = await prisma.announcement.findMany({ select: SELECT, orderBy: { id: "asc" } });
+    return rows.map(toAnnouncement);
   },
 
-  getById(id: number): Announcement | null {
-    return store.announcements[indexOf(id)] ?? null;
+  async getById(id: number): Promise<Announcement | null> {
+    if (!isValidId(id)) return null;
+    const row = await prisma.announcement.findUnique({ where: { id }, select: SELECT });
+    return row ? toAnnouncement(row) : null;
   },
 
-  // title and content are required; author is optional. id and createdAt are generated.
-  create(data: AnnouncementInput): Announcement {
+  // title and content are required; author is accepted but not stored. id and createdAt are set by the database.
+  async create(data: AnnouncementInput): Promise<Announcement> {
     const fields = validate(data, ["title", "content"]) as AnnouncementFields;
-    const announcement: Announcement = {
-      id: store.nextId++,
-      ...fields,
-      createdAt: new Date().toISOString(),
-    };
-    store.announcements.push(announcement);
-    return announcement;
+    const row = await prisma.announcement.create({
+      data: { title: fields.title, message: fields.content },
+      select: SELECT,
+    });
+    return toAnnouncement(row);
   },
 
   // Changes only the fields sent. Returns null if no announcement has this id.
-  update(id: number, partialData: AnnouncementInput): Announcement | null {
-    const index = indexOf(id);
-    if (index === -1) return null;
+  async update(id: number, partialData: AnnouncementInput): Promise<Announcement | null> {
+    if (!isValidId(id)) return null;
+    const current = await prisma.announcement.findUnique({ where: { id }, select: SELECT });
+    if (!current) return null;
 
     const fields = validate(partialData, []);
     if (Object.keys(fields).length === 0) {
       throw new ValidationError(`Send at least one of: ${FIELDS.join(", ")}.`);
     }
 
-    store.announcements[index] = { ...store.announcements[index], ...fields };
-    return store.announcements[index];
+    // Only author was sent: there is nothing to store, so the announcement stays as it is.
+    const columns = toColumns(fields);
+    if (Object.keys(columns).length === 0) return toAnnouncement(current);
+
+    const row = await prisma.announcement.update({ where: { id }, data: columns, select: SELECT });
+    return toAnnouncement(row);
   },
 
-  // Replaces the whole announcement: title and content are required, and author
-  // is removed if it isn't sent. id and createdAt are kept. Returns null if no
-  // announcement has this id.
-  replace(id: number, fullData: AnnouncementInput): Announcement | null {
-    const index = indexOf(id);
-    if (index === -1) return null;
+  // Replaces the announcement: title and content are required. id and createdAt are kept.
+  // Returns null if no announcement has this id.
+  async replace(id: number, fullData: AnnouncementInput): Promise<Announcement | null> {
+    if (!(await this.getById(id))) return null;
 
     const fields = validate(fullData, ["title", "content"]) as AnnouncementFields;
-    const { createdAt } = store.announcements[index];
-    store.announcements[index] = { id, ...fields, createdAt };
-    return store.announcements[index];
+    const row = await prisma.announcement.update({
+      where: { id },
+      data: { title: fields.title, message: fields.content },
+      select: SELECT,
+    });
+    return toAnnouncement(row);
   },
 
   // Returns false if no announcement has this id.
-  remove(id: number): boolean {
-    const index = indexOf(id);
-    if (index === -1) return false;
-
-    store.announcements.splice(index, 1);
-    return true;
+  async remove(id: number): Promise<boolean> {
+    if (!isValidId(id)) return false;
+    const { count } = await prisma.announcement.deleteMany({ where: { id } });
+    return count > 0;
   },
 };

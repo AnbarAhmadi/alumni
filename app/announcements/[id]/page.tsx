@@ -17,7 +17,7 @@ export default async function AnnouncementPage({ params, searchParams }: PagePro
   await connection();
   const { id } = await params;
   const { updated } = await searchParams;
-  const { ok, data: announcement } = AnnouncementController.show(id);
+  const { ok, data: announcement } = await AnnouncementController.show(id);
   if (!ok) notFound();
 
   return (

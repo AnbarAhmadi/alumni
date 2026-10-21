@@ -1,5 +1,48 @@
+# Docker Compose setup for the Alumni Tracking System.
+#
+# Settings come from environment variables. Docker Compose reads them from the
+# shell or from a .env file next to this file (copy .env.example to .env).
+# The user and password have NO defaults here, so no password is committed:
+# ${VAR:?message} makes Compose stop with that message if one is missing.
+# Only the database name has a default (${POSTGRES_DB:-alumni}); it is not a secret.
+
 services:
+  # The Next.js app (built from the Dockerfile in this folder).
   web:
     build: .
     ports:
       - "3000:3000"
+    environment:
+      # Connection string for the db service below.
+      # NOTE: the app does not use it yet; users and announcements are still kept in memory.
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in .env (copy .env.example to .env)}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example to .env)}@db:5432/${POSTGRES_DB:-alumni}
+    # Start the app only after the database passes its healthcheck.
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # PostgreSQL database. Its data is stored in the postgres_data volume,
+  # so it survives `docker compose down` (but not `docker compose down -v`).
+  db:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env (copy .env.example to .env)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example to .env)}
+      POSTGRES_DB: ${POSTGRES_DB:-alumni}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Only reachable from this computer (127.0.0.1), for tools like psql.
+    ports:
+      - "127.0.0.1:5432:5432"
+    # "Healthy" once PostgreSQL accepts connections. $$ passes $ to the container's shell.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+# Named volumes: Docker keeps these outside the containers.
+volumes:
+  postgres_data:

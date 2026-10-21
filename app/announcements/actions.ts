@@ -19,7 +19,7 @@ export async function createAnnouncementAction(
   _state: AnnouncementFormState,
   formData: FormData,
 ): Promise<AnnouncementFormState> {
-  const result = AnnouncementController.create(formData);
+  const result = await AnnouncementController.create(formData);
   if (!result.ok) return { error: result.error, field: result.field, values: typedValues(formData) };
 
   revalidatePath("/announcements");
@@ -31,7 +31,7 @@ export async function updateAnnouncementAction(
   _state: AnnouncementFormState,
   formData: FormData,
 ): Promise<AnnouncementFormState> {
-  const result = AnnouncementController.update(id, formData);
+  const result = await AnnouncementController.update(id, formData);
   if (!result.ok) return { error: result.error, field: result.field, values: typedValues(formData) };
 
   revalidatePath("/announcements");
@@ -39,7 +39,7 @@ export async function updateAnnouncementAction(
 }
 
 export async function deleteAnnouncementAction(id: number) {
-  AnnouncementController.remove(id);
+  await AnnouncementController.remove(id);
   revalidatePath("/announcements");
   redirect("/announcements");
 }

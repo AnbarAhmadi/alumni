@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default async function UsersPage({ searchParams }: PageProps<"/users">) {
   // Users live in memory and change at runtime, so render on every request.
   await connection();
-  const { data: users } = UserController.index();
+  const { data: users } = await UserController.index();
   const { created } = await searchParams;
 
   return (
