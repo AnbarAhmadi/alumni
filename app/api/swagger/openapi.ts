@@ -42,6 +42,31 @@ const exampleUser = {
   school: "Istanbul University",
 };
 
+const exampleJobPosting = {
+  id: 26,
+  userId: 1,
+  title: "Junior Data Analyst",
+  company: "Example Analytics",
+  city: "Istanbul",
+  description: "Two days a week in the office. SQL and Excel are a plus.",
+  createdAt: "2026-10-22T09:00:00.000Z",
+};
+
+const jobIdParam = {
+  name: "id",
+  in: "path",
+  required: true,
+  description: "The job posting's id.",
+  schema: { type: "integer", minimum: 1, example: 1 },
+};
+
+const exampleApplication = { id: 31, userId: 15, jobPostingId: 1, status: "applied", createdAt: "2026-10-22T10:00:00.000Z" };
+
+const jobNotFound = errorResponse("No job posting has this id, or (POST) no user has the userId in the body.", {
+  jobNotFound: ['Job posting "9999" not found.'],
+  userNotFound: ['User "9999" not found.'],
+});
+
 const userIdParam = {
   name: "id",
   in: "path",
@@ -113,6 +138,8 @@ export const openApiSpec = {
   },
   tags: [
     { name: "Users", description: "JSON API for users: create, read, update and delete." },
+    { name: "Job postings", description: "A user's job postings (nested under /api/users/{id}). The user always comes from the URL." },
+    { name: "Applications", description: "Users apply to job postings (many-to-many through applications). A user can apply to a posting only once." },
     {
       name: "Users (views)",
       description:
@@ -165,9 +192,13 @@ export const openApiSpec = {
       parameters: [userIdParam],
       get: {
         tags: ["Users"],
-        summary: "Get one user",
+        summary: "Get one user, with their job postings",
+        description: "The user and their job postings (oldest first) in a jobs array, loaded together. A user without postings gets jobs: [].",
         responses: {
-          200: { description: "The user.", content: json(ref("User"), exampleUser) },
+          200: {
+            description: "The user, with a jobs array.",
+            content: json(ref("UserWithJobs"), { ...exampleUser, jobs: [{ ...exampleJobPosting, id: 1 }] }),
+          },
           404: notFound,
         },
       },
@@ -216,6 +247,98 @@ export const openApiSpec = {
         summary: "Delete a user",
         responses: {
           204: { description: "The user was deleted. The response has no body." },
+          404: notFound,
+        },
+      },
+    },
+    "/api/users/{id}/jobs": {
+      parameters: [userIdParam],
+      get: {
+        tags: ["Job postings"],
+        summary: "List a user's job postings",
+        description: "The postings of the user in the URL, oldest first. An empty list if the user has none.",
+        responses: {
+          200: { description: "The user's job postings.", content: json({ type: "array", items: ref("JobPosting") }, [exampleJobPosting]) },
+          404: notFound,
+        },
+      },
+      post: {
+        tags: ["Job postings"],
+        summary: "Create a job posting for a user",
+        description:
+          "title and company are required; city and description are optional. " +
+          "The user comes from the URL: a userId in the body is ignored. id and createdAt are set by the database.",
+        requestBody: writeBody("JobPostingCreate", {
+          title: "Junior Data Analyst",
+          company: "Example Analytics",
+          city: "Istanbul",
+          description: "Two days a week in the office. SQL and Excel are a plus.",
+        }),
+        responses: {
+          201: { description: "The created job posting, with the userId from the URL.", content: json(ref("JobPosting"), exampleJobPosting) },
+          400: errorResponse("The body can't be read, or a field is missing or invalid.", {
+            missingTitle: ['"title" is required.', "title"],
+            missingCompany: ['"company" is required.', "company"],
+            emptyCity: ['"city" must be a non-empty string.', "city"],
+            invalidJson: ["Request body must be valid JSON."],
+          }),
+          404: notFound,
+          415: unsupportedType,
+        },
+      },
+    },
+    "/api/jobs/{id}/applications": {
+      parameters: [jobIdParam],
+      get: {
+        tags: ["Applications"],
+        summary: "List the applicants of a job posting",
+        description: "The applications to the posting in the URL, oldest first, each with the applicant's id and name.",
+        responses: {
+          200: {
+            description: "The applications, with the applicant's name.",
+            content: json({ type: "array", items: ref("ApplicationWithUser") }, [
+              { ...exampleApplication, user: { id: 15, fullName: "Salim Denkel" } },
+            ]),
+          },
+          404: errorResponse("No job posting has this id.", { jobNotFound: ['Job posting "9999" not found.'] }),
+        },
+      },
+      post: {
+        tags: ["Applications"],
+        summary: "Apply to a job posting",
+        description:
+          "Body: the applicant's userId. The posting comes from the URL (a jobPostingId in the body is ignored). " +
+          "status is optional and defaults to applied. A second application by the same user to the same posting " +
+          "is refused by the database's unique pair (userId, jobPostingId): 409.",
+        requestBody: writeBody("ApplicationCreate", { userId: 15 }),
+        responses: {
+          201: { description: "The created application.", content: json(ref("Application"), exampleApplication) },
+          400: errorResponse("The body can't be read, or userId is missing or not a positive whole number.", {
+            missingUserId: ['"userId" is required.', "userId"],
+            invalidUserId: ['"userId" must be a positive whole number.', "userId"],
+            invalidJson: ["Request body must be valid JSON."],
+          }),
+          404: jobNotFound,
+          409: errorResponse("This user has already applied to this job posting.", {
+            duplicate: ["This user has already applied to this job posting.", "jobPostingId"],
+          }),
+          415: unsupportedType,
+        },
+      },
+    },
+    "/api/users/{id}/applications": {
+      parameters: [userIdParam],
+      get: {
+        tags: ["Applications"],
+        summary: "List the job postings a user applied to",
+        description: "The user's applications, oldest first, each with the posting's id, title and company.",
+        responses: {
+          200: {
+            description: "The applications, with the posting's title and company.",
+            content: json({ type: "array", items: ref("ApplicationWithJobPosting") }, [
+              { ...exampleApplication, jobPosting: { id: 1, title: "Junior Software Developer", company: "Yundt, MacGyver and Hyatt" } },
+            ]),
+          },
           404: notFound,
         },
       },
@@ -650,6 +773,92 @@ export const openApiSpec = {
           content: { type: "string", minLength: 1 },
           author: { type: "string", minLength: 1 },
         },
+      },
+      UserWithJobs: {
+        allOf: [
+          ref("User"),
+          {
+            type: "object",
+            required: ["jobs"],
+            properties: {
+              jobs: {
+                type: "array",
+                description: "The user's job postings, oldest first. Empty ([]) if the user has none.",
+                items: ref("JobPosting"),
+              },
+            },
+          },
+        ],
+      },
+      JobPosting: {
+        type: "object",
+        required: ["id", "userId", "title", "company", "createdAt"],
+        properties: {
+          id: { type: "integer", example: 26 },
+          userId: { type: "integer", description: "The user who posted it (from the URL).", example: 1 },
+          title: { type: "string", example: "Junior Data Analyst" },
+          company: { type: "string", example: "Example Analytics" },
+          city: { type: "string", description: "Optional; left out when empty.", example: "Istanbul" },
+          description: { type: "string", description: "Optional long text; left out when empty." },
+          createdAt: { type: "string", format: "date-time", example: "2026-10-22T09:00:00.000Z" },
+        },
+      },
+      JobPostingCreate: {
+        type: "object",
+        description: "userId is not sent: it comes from the URL, and one in the body is ignored.",
+        required: ["title", "company"],
+        properties: {
+          title: { type: "string", minLength: 1 },
+          company: { type: "string", minLength: 1 },
+          city: { type: "string", minLength: 1 },
+          description: { type: "string", minLength: 1 },
+        },
+      },
+      Application: {
+        type: "object",
+        required: ["id", "userId", "jobPostingId", "status", "createdAt"],
+        properties: {
+          id: { type: "integer", example: 31 },
+          userId: { type: "integer", description: "The applicant.", example: 15 },
+          jobPostingId: { type: "integer", description: "The posting (from the URL).", example: 1 },
+          status: { type: "string", example: "applied" },
+          createdAt: { type: "string", format: "date-time", example: "2026-10-22T10:00:00.000Z" },
+        },
+      },
+      ApplicationCreate: {
+        type: "object",
+        required: ["userId"],
+        properties: {
+          userId: { type: "integer", minimum: 1, description: "The applicant's id." },
+          status: { type: "string", minLength: 1, description: "Optional; defaults to applied." },
+        },
+      },
+      ApplicationWithUser: {
+        allOf: [
+          ref("Application"),
+          {
+            type: "object",
+            required: ["user"],
+            properties: {
+              user: { type: "object", properties: { id: { type: "integer" }, fullName: { type: "string" } } },
+            },
+          },
+        ],
+      },
+      ApplicationWithJobPosting: {
+        allOf: [
+          ref("Application"),
+          {
+            type: "object",
+            required: ["jobPosting"],
+            properties: {
+              jobPosting: {
+                type: "object",
+                properties: { id: { type: "integer" }, title: { type: "string" }, company: { type: "string" } },
+              },
+            },
+          },
+        ],
       },
       Error: {
         type: "object",

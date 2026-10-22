@@ -30,9 +30,9 @@ export async function getAll(_request: Request) {
   return NextResponse.json(await UserModel.getAll());
 }
 
-// GET /api/users/[id] → 200 | 404
+// GET /api/users/[id] → 200 (the user with a "jobs" array) | 404
 export async function getById(_request: Request, id: string) {
-  const user = await UserModel.getById(toId(id));
+  const user = await UserModel.getByIdWithJobs(toId(id));
   if (!user) return notFound(id);
 
   return NextResponse.json(user);

@@ -80,7 +80,7 @@ alumni/
 │   │   ├── page.tsx                      # /users: users table and the "Add a user" form
 │   │   ├── actions.ts                    # Server actions for the forms: create, update and delete
 │   │   └── [id]/                         # [id] is the user's id from the URL
-│   │       ├── page.tsx                  # /users/:id: one user's details, with Edit and Delete
+│   │       ├── page.tsx                  # /users/:id: one user's details, with Edit and Delete, and their job postings
 │   │       ├── not-found.tsx             # "User not found" page for an unknown id
 │   │       └── edit/
 │   │           └── page.tsx              # /users/:id/edit: the edit form, filled with the user's data
@@ -98,7 +98,15 @@ alumni/
 │   │   ├── users/
 │   │   │   ├── route.ts                  # GET and POST /api/users → ApiUserController
 │   │   │   └── [id]/
-│   │   │       └── route.ts              # GET, PUT, PATCH and DELETE /api/users/:id → ApiUserController
+│   │   │       ├── route.ts              # GET, PUT, PATCH and DELETE /api/users/:id → ApiUserController
+│   │   │       ├── jobs/
+│   │   │       │   └── route.ts          # GET and POST /api/users/:id/jobs → ApiUserJobController
+│   │   │       └── applications/
+│   │   │           └── route.ts          # GET /api/users/:id/applications → ApiApplicationController
+│   │   ├── jobs/
+│   │   │   └── [id]/
+│   │   │       └── applications/
+│   │   │           └── route.ts          # GET and POST /api/jobs/:id/applications → ApiApplicationController
 │   │   ├── announcements/
 │   │   │   ├── route.ts                  # GET and POST /api/announcements → ApiAnnouncementController
 │   │   │   └── [id]/
@@ -118,9 +126,13 @@ alumni/
 │               └── route.ts              # GET /sum/:number1/:number2: adds the two numbers
 ├── models/                               # MODEL
 │   ├── User.ts                           # User type, validation, UserModel CRUD on the users table (Prisma)
-│   └── Announcement.ts                   # Announcement type, validation, AnnouncementModel CRUD on the announcements table (Prisma)
+│   ├── Announcement.ts                   # Announcement type, validation, AnnouncementModel CRUD on the announcements table (Prisma)
+│   ├── JobPosting.ts                     # JobPosting type, validation, JobPostingModel CRUD on job_postings (used by /api/users/:id/jobs)
+│   └── Application.ts                    # Application type, validation, ApplicationModel CRUD on applications (used by the application endpoints)
 ├── controllers/                          # CONTROLLERS
 │   ├── ApiUserController.ts              # For /api/users: calls UserModel and returns JSON with status codes
+│   ├── ApiUserJobController.ts           # For /api/users/:id/jobs: a user's job postings (JobPostingModel), JSON with status codes
+│   ├── ApiApplicationController.ts       # For /api/jobs/:id/applications and /api/users/:id/applications (409 for a repeat)
 │   ├── UserController.ts                 # For /users: calls UserModel and returns { ok, data, error, field }
 │   ├── ApiAnnouncementController.ts      # For /api/announcements: calls AnnouncementModel and returns JSON with status codes
 │   └── AnnouncementController.ts         # For /announcements: calls AnnouncementModel and returns { ok, data, error, field }
@@ -130,19 +142,28 @@ alumni/
 │   ├── UserForm.tsx                      # Create and edit form; shows errors under the right field (client component)
 │   ├── DeleteUserButton.tsx              # Delete button that asks "Delete <name>?" first (client component)
 │   ├── UserNav.tsx                       # Links: All users, Details, Edit, + New user
+│   ├── JobPostingTable.tsx               # A user's job postings (title, company, city), or "No job postings yet."
 │   ├── AnnouncementTable.tsx             # Table of announcements with View, Edit and Delete; "Added" notice
 │   ├── AnnouncementDetails.tsx           # One announcement as label/value rows; formats the createdAt date
 │   ├── AnnouncementForm.tsx              # Create and edit form with a content box; errors under the right field (client component)
 │   ├── DeleteAnnouncementButton.tsx      # Reuses DeleteUserButton with the announcement title in the confirmation
 │   └── AnnouncementNav.tsx               # Links: All announcements, Details, Edit, + New announcement
 ├── lib/                                  # Helpers shared by the controllers and models
-│   ├── parseBody.ts                      # Reads JSON, multipart/form-data and urlencoded bodies; turns age into a number
+│   ├── parseBody.ts                      # Reads JSON, multipart/form-data and urlencoded bodies; turns age and ids into numbers
 │   └── prisma.ts                         # The one shared Prisma Client (pg adapter), reused across hot reloads
 ├── prisma/                               # Database structure (Prisma Migrate) and the development seed
-│   ├── schema.prisma                     # The users and announcements tables, following the design in ddd.md
+│   ├── schema.prisma                     # The four tables (users, announcements, job_postings, applications), following ddd.md
+│   ├── seed.mts                          # Development seed: fake users, announcements, job postings and applications
+│   ├── factories/                        # One Faker factory per table (fixed seed, so every run is the same)
+│   │   ├── userFactory.mts               # Fake users
+│   │   ├── announcementFactory.mts       # Fake announcements
+│   │   ├── jobPostingFactory.mts         # Fake job postings (2 or 3 per user given)
+│   │   └── applicationFactory.mts        # Fake applications (different user/posting pairs)
 │   └── migrations/                       # SQL migrations created by npx prisma migrate dev
 │       ├── 20261021215739_init/
 │       │   └── migration.sql             # First migration: creates the users and announcements tables
+│       ├── 20261021223924_add_job_postings_applications/
+│       │   └── migration.sql             # Second migration: creates job_postings and applications with their foreign keys
 │       └── migration_lock.toml           # Records the database provider (postgresql); written by Prisma
 ├── prisma.config.ts                      # Prisma CLI settings: schema and migrations paths, DATABASE_URL from .env
 ├── eslint.config.mjs                     # ESLint setup (Next.js recommended rules + TypeScript rules)
@@ -221,7 +242,7 @@ Both models have the same functions (`getAll`, `getById`, `create`, `update`, `r
 | `/about` | GET | About the Alumni System |
 | `/users` | GET | Table of all users and the "Add a user" form |
 | `/users` | POST (form) | Add a user, or delete one from a table row |
-| `/users/:id` | GET | One user's details, with Edit and Delete buttons |
+| `/users/:id` | GET | One user's details, with Edit and Delete buttons, and a table of their job postings ("No job postings yet." if none) |
 | `/users/:id` | POST (form) | Delete the user |
 | `/users/:id/edit` | GET | Edit form filled with the user's data |
 | `/users/:id/edit` | POST (form) | Save changes (only the filled-in fields change) |
@@ -240,10 +261,15 @@ The `POST` rows are form submissions handled by server actions. An unknown id sh
 | --- | --- | --- | --- | --- |
 | GET | `/api/users` | — | `200` array of users | — |
 | POST | `/api/users` | `fullName`, `email`, `age` (required), `school` (optional) | `201` new user | `400` invalid data, `409` email already used, `415` unsupported Content-Type |
-| GET | `/api/users/:id` | — | `200` user | `404` not found |
+| GET | `/api/users/:id` | — | `200` user, with their job postings in a `jobs` array (`[]` if none) | `404` not found |
 | PUT | `/api/users/:id` | `fullName`, `email`, `age`, `school` (all required) | `200` updated user | `400`, `404`, `409`, `415` |
 | PATCH | `/api/users/:id` | Any of `fullName`, `email`, `age`, `school` (at least one) | `200` updated user | `400`, `404`, `409`, `415` |
 | DELETE | `/api/users/:id` | — | `204` no body | `404` not found |
+| GET | `/api/users/:id/jobs` | — | `200` array of that user's job postings | `404` user not found |
+| POST | `/api/users/:id/jobs` | `title`, `company` (required), `city`, `description` (optional); the user comes from the URL, and a `userId` in the body is ignored | `201` new job posting (with `userId`) | `400` invalid data, `404` user not found, `415` unsupported Content-Type |
+| GET | `/api/users/:id/applications` | — | `200` the postings the user applied to, each with `jobPosting` (`id`, `title`, `company`) | `404` user not found |
+| POST | `/api/jobs/:id/applications` | `userId` (required: the applicant), `status` (optional, default `applied`); the posting comes from the URL | `201` new application | `400` missing or non-numeric `userId`, `404` posting or user not found, `409` this user already applied to this posting, `415` unsupported Content-Type |
+| GET | `/api/jobs/:id/applications` | — | `200` the applications to the posting, each with `user` (`id`, `fullName`) | `404` posting not found |
 | GET | `/api/announcements` | — | `200` array of announcements | — |
 | POST | `/api/announcements` | `title`, `content` (required), `author` (optional) | `201` new announcement | `400` invalid data, `415` unsupported Content-Type |
 | GET | `/api/announcements/:id` | — | `200` announcement | `404` not found |
@@ -278,9 +304,11 @@ With the app running (`npm run dev`), open the Swagger UI:
 
 The raw OpenAPI spec is at http://localhost:3000/api/swagger/openapi.json. Swagger UI is loaded from the unpkg CDN, so the page needs an internet connection.
 
-Swagger groups the routes into six tags:
+Swagger groups the routes into eight tags:
 
 - **Users:** the JSON API. Each operation shows its request body (as JSON or form-data), its response codes and examples. Use **Try it out** to send real requests from the browser.
+- **Job postings:** a user's job postings, `GET` and `POST /api/users/{id}/jobs`. The user comes from the URL.
+- **Applications:** `POST` and `GET /api/jobs/{id}/applications` (apply, and list the applicants with their names) and `GET /api/users/{id}/applications` (the postings a user applied to).
 - **Users (views):** the `/users` HTML pages and their forms. The form submissions are server actions, so they are documented but can't be sent with Try it out.
 - **Announcements:** the announcements JSON API, documented the same way as Users.
 - **Announcements (views):** the `/announcements` HTML pages and their forms.
@@ -487,7 +515,7 @@ docker compose ps db
 npx prisma migrate deploy
 ```
 
-**4. Run the seed.** First generate the Prisma Client (it is git-ignored, so a fresh clone doesn't have it). Then fill the tables with fake development data: the seed empties `users` and `announcements` and inserts 20 fake users and 5 fake announcements, made with Faker using a fixed seed, so every run gives the same rows. Running it again never adds duplicates. It refuses to run when `NODE_ENV` is `production`. See [ddd.md](ddd.md).
+**4. Run the seed.** First generate the Prisma Client (it is git-ignored, so a fresh clone doesn't have it). Then fill the tables with fake development data: the seed empties all four tables and inserts 20 fake users, 5 fake announcements, 2 or 3 job postings for each of the first 10 users (25 in total), and 30 applications between random users and postings (never the same pair twice), made with Faker using a fixed seed, so every run gives the same rows. Running it again never adds duplicates. It refuses to run when `NODE_ENV` is `production`. See [ddd.md](ddd.md).
 
 ```bash
 npx prisma generate

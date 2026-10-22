@@ -27,6 +27,10 @@ model User {
   isAlumni       Boolean @default(false)
   graduationYear Int?
 
+  // Relations only (no columns in users): see job_postings and applications below.
+  jobPostings  JobPosting[]
+  applications Application[]
+
   @@map("users")
 }
 
@@ -37,4 +41,35 @@ model Announcement {
   postedAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@map("announcements")
+}
+
+// One user has many job postings; each posting belongs to exactly one user.
+// Deleting the user deletes their postings (no orphan postings), see ddd.md.
+model JobPosting {
+  id           Int           @id @default(autoincrement())
+  userId       Int
+  title        String
+  company      String
+  city         String?
+  description  String?
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@map("job_postings")
+}
+
+// Users and job postings are many-to-many through applications.
+// A user can apply to a posting only once; deleting the user or the posting deletes the application.
+model Application {
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  jobPostingId Int
+  status       String     @default("applied")
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobPosting   JobPosting @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobPostingId])
+  @@map("applications")
 }

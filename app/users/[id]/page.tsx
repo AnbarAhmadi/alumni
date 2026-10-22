@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import * as UserController from "@/controllers/UserController";
 import UserDetails from "@/components/UserDetails";
+import JobPostingTable from "@/components/JobPostingTable";
 import UserNav from "@/components/UserNav";
 import DeleteUserButton from "@/components/DeleteUserButton";
 import { deleteUserAction } from "../actions";
@@ -12,12 +13,12 @@ export const metadata: Metadata = {
   title: "User details | Alumni Tracking System",
 };
 
-// GET /users/[id]: one user (Read). Delete posts back to this page.
+// GET /users/[id]: one user and their job postings (Read). Delete posts back to this page.
 export default async function UserPage({ params, searchParams }: PageProps<"/users/[id]">) {
   await connection();
   const { id } = await params;
   const { updated } = await searchParams;
-  const { ok, data: user } = await UserController.show(id);
+  const { ok, data: user } = await UserController.showWithJobs(id);
   if (!ok) notFound();
 
   return (
@@ -36,6 +37,11 @@ export default async function UserPage({ params, searchParams }: PageProps<"/use
           <Link href={`/users/${user.id}/edit`} className="button primary">Edit</Link>
           <DeleteUserButton action={deleteUserAction.bind(null, user.id)} name={user.fullName} />
         </div>
+      </section>
+
+      <section className="panel">
+        <h2 className="section-title">Job postings ({user.jobs.length})</h2>
+        <JobPostingTable jobs={user.jobs} />
       </section>
     </main>
   );
