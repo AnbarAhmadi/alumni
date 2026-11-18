@@ -30,6 +30,8 @@ This project is being built incrementally over the semester. Status is updated w
 - [x] **Week 3:** Users JSON API with full CRUD (`/api/users`), health check, Swagger UI
 - [x] **Week 4:** MVC refactor (one model, two controllers, view components), `/users` web pages with list, create, view, edit and delete, and an Announcements module (model, two controllers, routes, `/announcements` pages)
 - [x] **Week 5:** Docker setup (Dockerfile and Docker Compose), a PostgreSQL container with a persistent volume, and the data design documentation (`ddd.md`)
+- [x] **Week 6:** Job postings and applications: two new tables (migration and seed), their API (`/api/users/:id/jobs`, `/api/jobs/:id/applications`, `/api/users/:id/applications`) and a user's job postings on the `/users/:id` page
+- [x] **Week 7:** Validation rules for job postings (title required, at most 120 characters), a request logger (`withLogger`), one JSON 404 shape with a reason for the whole API (with a catch-all route), a safe `500` answer for unexpected errors, an error log file (`logs/error.log`) and one generic 404 page for the website
 
 ### Upcoming
 
@@ -51,11 +53,12 @@ This project is being built incrementally over the semester. Status is updated w
 | Language | TypeScript | TypeScript 7 for type checking; the TypeScript 6 API is installed alongside it because ESLint needs it |
 | Framework | Next.js 16 (App Router), React 19 | Pages, API routes and server actions all live in `app/` |
 | Runtime | Node.js | Developed with Node.js 24 |
-| Architecture | MVC | One model, two controllers, React view components |
-| Data storage | PostgreSQL, through the models (`models/User.ts` and `models/Announcement.ts`) | Data is kept when the server or the containers restart |
+| Architecture | MVC | Models in `models/`, API and web controllers in `controllers/`, React view components in `components/` |
+| Data storage | PostgreSQL, through the four models (`models/User.ts`, `Announcement.ts`, `JobPosting.ts`, `Application.ts`) | Data is kept when the server or the containers restart |
 | Database | PostgreSQL 17 in Docker | Runs as a container with a volume; the app reads and writes it |
 | Migrations | Prisma Migrate | Creates the database tables |
 | ORM | Prisma Client with `@prisma/adapter-pg` | Used by the models through one shared client in `lib/prisma.ts` |
+| Logging and errors | `lib/withLogger.ts` and `lib/notFound.ts` (Week 7) | One log line per API request, one JSON 404 shape, a safe `500` answer and `logs/error.log` |
 | API documentation | OpenAPI 3.0 + Swagger UI | The spec is written in `app/api/swagger/openapi.ts`; Swagger UI is loaded from the unpkg CDN, so it needs an internet connection |
 | Code quality | ESLint 9 with `eslint-config-next` | Next.js core-web-vitals and TypeScript rules |
 | Package manager | npm | |
@@ -73,6 +76,7 @@ alumni/
 ├── app/                                  # Next.js App Router: a file's folder path is its URL
 │   ├── layout.tsx                        # Wraps every page: site header, navigation links and footer
 │   ├── page.tsx                          # Home page (/): hero section and the "Explore" cards
+│   ├── not-found.tsx                     # The one 404 page of the website: unknown URLs (/banana) and unknown ids (/users/9999) (Week 7)
 │   ├── globals.css                       # Styles for the whole site, including the /users pages
 │   ├── about/
 │   │   └── page.tsx                      # About page (/about): what the system is for
@@ -81,7 +85,6 @@ alumni/
 │   │   ├── actions.ts                    # Server actions for the forms: create, update and delete
 │   │   └── [id]/                         # [id] is the user's id from the URL
 │   │       ├── page.tsx                  # /users/:id: one user's details, with Edit and Delete, and their job postings
-│   │       ├── not-found.tsx             # "User not found" page for an unknown id
 │   │       └── edit/
 │   │           └── page.tsx              # /users/:id/edit: the edit form, filled with the user's data
 │   ├── announcements/                    # The announcements web pages (HTML)
@@ -89,10 +92,11 @@ alumni/
 │   │   ├── actions.ts                    # Server actions for the forms: create, update and delete
 │   │   └── [id]/                         # [id] is the announcement's id from the URL
 │   │       ├── page.tsx                  # /announcements/:id: one announcement's details, with Edit and Delete
-│   │       ├── not-found.tsx             # "Announcement not found" page for an unknown id
 │   │       └── edit/
 │   │           └── page.tsx              # /announcements/:id/edit: the edit form, filled with the current values
 │   ├── api/                              # JSON API routes
+│   │   ├── [[...slug]]/
+│   │   │   └── route.ts                  # Any unknown /api path, any method: 404 { "error": "Not found", "reason": "No route GET /api/..." } (Week 7)
 │   │   ├── health/
 │   │   │   └── route.ts                  # GET /api/health: says the server is running
 │   │   ├── users/
@@ -148,9 +152,11 @@ alumni/
 │   ├── AnnouncementForm.tsx              # Create and edit form with a content box; errors under the right field (client component)
 │   ├── DeleteAnnouncementButton.tsx      # Reuses DeleteUserButton with the announcement title in the confirmation
 │   └── AnnouncementNav.tsx               # Links: All announcements, Details, Edit, + New announcement
-├── lib/                                  # Helpers shared by the controllers and models
+├── lib/                                  # Helpers shared by the routes, controllers and models
+│   ├── notFound.ts                       # The one JSON 404 answer of the API: { "error": "Not found", "reason": "..." } (Week 7)
 │   ├── parseBody.ts                      # Reads JSON, multipart/form-data and urlencoded bodies; turns age and ids into numbers
-│   └── prisma.ts                         # The one shared Prisma Client (pg adapter), reused across hot reloads
+│   ├── prisma.ts                         # The one shared Prisma Client (pg adapter), reused across hot reloads
+│   └── withLogger.ts                     # Wraps every /api route handler: one log line per request, safe 500 answer, logs/error.log (Week 7)
 ├── prisma/                               # Database structure (Prisma Migrate) and the development seed
 │   ├── schema.prisma                     # The four tables (users, announcements, job_postings, applications), following ddd.md
 │   ├── seed.mts                          # Development seed: fake users, announcements, job postings and applications
@@ -171,7 +177,7 @@ alumni/
 ├── tsconfig.json                         # TypeScript settings; "@/..." imports start at the project root
 ├── package.json                          # Project name, npm scripts and dependencies
 ├── package-lock.json                     # Exact installed versions of the dependencies
-├── .gitignore                            # Keeps node_modules, .next, .env files and local Postman files out of Git
+├── .gitignore                            # Keeps node_modules, .next, generated/, logs/, .env files and local Postman files out of Git
 ├── Dockerfile                            # Multi-stage build of the app image (node:24-alpine, standalone server, non-root user)
 ├── docker-compose.yml                    # Services: web (the app) and db (PostgreSQL 17 with the postgres_data volume)
 ├── .dockerignore                         # Keeps node_modules, .next, .git, .env files and Postman files out of the image
@@ -182,7 +188,7 @@ alumni/
 └── README.md                             # This file
 ```
 
-Folders that exist on a developer's machine but are **not** committed: `node_modules/` (installed packages), `.next/` (build output) `postman/` (local Postman files) and `generated/` (the Prisma Client, made by `npx prisma generate`). The `.env` file is not committed either: it holds the real local settings, and only the template `.env.example` is in Git.
+Folders that exist on a developer's machine but are **not** committed: `node_modules/` (installed packages), `.next/` (build output), `postman/` (local Postman files), `generated/` (the Prisma Client, made by `npx prisma generate`) and `logs/` (`error.log`, written by the app when an unexpected error happens). The `.env` file is not committed either: it holds the real local settings, and only the template `.env.example` is in Git.
 
 ---
 
@@ -196,11 +202,11 @@ The app follows **MVC (Model–View–Controller)**. Each part has one job:
 | **View** | Shows data on the screen. The components only display what they are given and never touch the model. | `components/` |
 | **Controller** | Sits in the middle: takes the request, calls the model, and decides what to send back. | `controllers/` |
 
-In Next.js the `app/` folder is the router: where a file is decides its URL. The route and page files are kept thin, so they only pass the request to a controller. The small routes with no data (`/api/health`, `/api/swagger`, `/hello`, `/sum`) answer directly.
+In Next.js the `app/` folder is the router: where a file is decides its URL. The route and page files are kept thin, so they only pass the request to a controller. The small routes with no data (`/api/health`, `/api/swagger`, `/hello`, `/sum`) answer directly. Every handler under `app/api/` is wrapped with `withLogger` (Week 7), which logs the request and turns an unexpected error into a safe `500` (see Logging and Error Handling).
 
 There are **two controllers** for the **same model**, because the two kinds of client need different answers:
 
-- **`ApiUserController`** is for programs (curl, Postman, Swagger). It returns JSON with HTTP status codes (`200`, `201`, `204`, `400`, `404`, `415`).
+- **`ApiUserController`** is for programs (curl, Postman, Swagger). It returns JSON with HTTP status codes (`200`, `201`, `204`, `400`, `404`, `409`, `415`); an unexpected error becomes `500` in `withLogger`.
 - **`UserController`** is for the web pages. It returns a result object `{ ok, data, error, field }`, and the page decides which view to show.
 
 Both controllers reach the data only through `UserModel`, which stores it in PostgreSQL. Moving from memory to the database changed only the model files, plus `await` in the controllers, pages and server actions that call them.
@@ -209,10 +215,11 @@ Both controllers reach the data only through `UserModel`, which stores it in Pos
 
 `POST /api/users` with a JSON body:
 
-1. **Route** (`app/api/users/route.ts`) receives the request and passes it to the controller.
+1. **Route** (`app/api/users/route.ts`) receives the request and passes it to the controller. The handler is wrapped with `withLogger`.
 2. **Controller** (`ApiUserController.create`) reads the body with `parseBody` and calls the model.
 3. **Model** (`UserModel.create`) validates the data, saves the user and returns it.
-4. **Response:** the controller sends `201 Created` with the new user, or `400` with the field name if validation fails.
+4. **Response:** the controller sends `201 Created` with the new user, `400` with the field name if validation fails, or `409` if the email is already used.
+5. **Log:** `withLogger` writes one line such as `10:20:30 POST /api/users 201 18 ms` to the terminal. If anything on the way throws (for example the database is down), it answers `500` `{ "error": "Internal server error" }` instead and writes the error to `logs/error.log`.
 
 The `/users` web form follows the same path, except a server action (`createUserAction`) and `UserController` replace the route and `ApiUserController`, and the result is shown by `UserForm` and `UserTable`.
 
@@ -252,8 +259,9 @@ Both models have the same functions (`getAll`, `getById`, `create`, `update`, `r
 | `/announcements/:id` | POST (form) | Delete the announcement |
 | `/announcements/:id/edit` | GET | Edit form filled with the announcement's data |
 | `/announcements/:id/edit` | POST (form) | Save changes (only the filled-in fields change) |
+| Any other URL, for example `/banana` | GET | The generic "Page not found" page, with status `404` (Week 7) |
 
-The `POST` rows are form submissions handled by server actions. An unknown id shows the "User not found" or "Announcement not found" page with a `404` status.
+The `POST` rows are form submissions handled by server actions. An unknown or invalid id (`/users/9999`, `/users/abc`, also on the `/edit` pages and for announcements) and any unknown page URL (`/banana`) show the generic "Page not found" page (`app/not-found.tsx`, Week 7) with a `404` status and a link back to the home page. The JSON API keeps its own JSON 404.
 
 ### JSON API
 
@@ -266,7 +274,7 @@ The `POST` rows are form submissions handled by server actions. An unknown id sh
 | PATCH | `/api/users/:id` | Any of `fullName`, `email`, `age`, `school` (at least one) | `200` updated user | `400`, `404`, `409`, `415` |
 | DELETE | `/api/users/:id` | — | `204` no body | `404` not found |
 | GET | `/api/users/:id/jobs` | — | `200` array of that user's job postings | `404` user not found |
-| POST | `/api/users/:id/jobs` | `title`, `company` (required), `city`, `description` (optional); the user comes from the URL, and a `userId` in the body is ignored | `201` new job posting (with `userId`) | `400` invalid data, `404` user not found, `415` unsupported Content-Type |
+| POST | `/api/users/:id/jobs` | `title` (required, at most 120 characters), `company` (required), `city`, `description` (optional); the user comes from the URL, and a `userId` in the body is ignored | `201` new job posting (with `userId`) | `400` invalid data, `404` user not found, `415` unsupported Content-Type |
 | GET | `/api/users/:id/applications` | — | `200` the postings the user applied to, each with `jobPosting` (`id`, `title`, `company`) | `404` user not found |
 | POST | `/api/jobs/:id/applications` | `userId` (required: the applicant), `status` (optional, default `applied`); the posting comes from the URL | `201` new application | `400` missing or non-numeric `userId`, `404` posting or user not found, `409` this user already applied to this posting, `415` unsupported Content-Type |
 | GET | `/api/jobs/:id/applications` | — | `200` the applications to the posting, each with `user` (`id`, `fullName`) | `404` posting not found |
@@ -276,10 +284,27 @@ The `POST` rows are form submissions handled by server actions. An unknown id sh
 | PUT | `/api/announcements/:id` | `title`, `content` (required), `author` (optional; removed if not sent) | `200` updated announcement | `400`, `404`, `415` |
 | PATCH | `/api/announcements/:id` | Any of `title`, `content`, `author` (at least one) | `200` updated announcement | `400`, `404`, `415` |
 | DELETE | `/api/announcements/:id` | — | `204` no body | `404` not found |
+| Any | Any other path under `/api` (Week 7) | — | — | `404` `{ "error": "Not found", "reason": "No route GET /api/..." }` |
+
+Any of these can also answer `500` `{ "error": "Internal server error" }` if something unexpected fails (see Error responses below).
 
 An announcement's `createdAt` is always set by the server, and a `createdAt` sent in the body is ignored.
 
-POST, PUT and PATCH accept `application/json`, `multipart/form-data` and `application/x-www-form-urlencoded`. An `id` sent in the body is always ignored: new ids are generated, and other ids come from the URL. Errors come back as `{ "error": "..." }`, with a `field` when one field is to blame.
+POST, PUT and PATCH accept `application/json`, `multipart/form-data` and `application/x-www-form-urlencoded`. An `id` sent in the body is always ignored: new ids are generated, and other ids come from the URL.
+
+**Job posting rules (Week 7):** `title` is required and at most 120 characters after trimming, `company` is required, and `city` and `description` are optional (if sent, they must not be empty). A 121-character title gives `400` `{ "error": "\"title\" must be at most 120 characters.", "field": "title" }`. The limit is checked by the app only; the database column has no length limit. See [ddd.md](ddd.md).
+
+### Error responses
+
+| Status | When | Body |
+| --- | --- | --- |
+| `400` | Invalid data, or the body can't be read | `{ "error": "...", "field": "..." }` (`field` only when one field is to blame) |
+| `404` | Unknown id, or unknown path under `/api` (Week 7) | Always `{ "error": "Not found", "reason": "..." }`, for example `"User 9999 does not exist"`, `"Job posting 9999 does not exist"` or `"No route GET /api/banana"` |
+| `409` | The email is already used, or the user already applied to this posting | `{ "error": "...", "field": "email" }` or `{ "error": "...", "field": "jobPostingId" }` |
+| `415` | Unsupported `Content-Type` on POST, PUT or PATCH | `{ "error": "Unsupported Content-Type ..." }` |
+| `500` | Any unexpected error, for example the database is down (Week 7) | Always `{ "error": "Internal server error" }`: no stack trace and no internal message |
+
+The `404` body is built once in `lib/notFound.ts`, and the `500` answer once in `lib/withLogger.ts`, so every controller and route answers the same way. A method that an existing route doesn't have (for example `DELETE /api/users`) gets Next.js's own `405` with an empty body; it is not logged.
 
 **Duplicate emails give `409 Conflict`.** Emails are trimmed and stored in lowercase, and the database's unique index on `email` rejects a second user with the same email. The API then answers `409` with `{ "error": "\"email\" is already used by another user.", "field": "email" }`, and the `/users` forms show the same message under the email field.
 
@@ -315,15 +340,53 @@ Swagger groups the routes into eight tags:
 - **Health:** `/api/health`.
 - **Examples:** `/hello`, `/hello/{name}` and `/sum/{number1}/{number2}`.
 
+Every `/api` operation in Swagger also lists the shared `500` response, and its `404` examples use the `{ "error": "Not found", "reason": "..." }` shape (Week 7).
+
+---
+
+## 🛡️ Logging and Error Handling (Week 7)
+
+Next.js has no `app.use()`, and `proxy.ts` runs before a route, so it never sees the final status code. Instead, every handler under `app/api/` is wrapped once with `withLogger` from `lib/withLogger.ts`, for example `export const GET = withLogger(handler)`. The controllers don't log or catch unexpected errors themselves.
+
+**Request log.** Every `/api` request writes one line to the terminal where `npm run dev` runs (inside Docker: `docker compose logs web`):
+
+```
+10:20:30 POST /api/users 201 18 ms
+```
+
+That is the time, method, path, status code and duration. Request bodies are never logged. Error answers (`400`, `404`, `409`, `415`, `500`) are logged too. The web pages, `/hello` and `/sum` are not wrapped, so they are not logged.
+
+**404 Guardian.** Every `404` of the API has the same body, built by `lib/notFound.ts`: `{ "error": "Not found", "reason": "User 9999 does not exist" }`. The controllers use it for unknown ids. The catch-all route `app/api/[[...slug]]/route.ts` answers any unknown path under `/api`, for every method: `GET /api/banana` → `{ "error": "Not found", "reason": "No route GET /api/banana" }`. Next.js always prefers a more specific route, so the catch-all never hides a real one.
+
+**5xx Guardian.** If a handler throws (for example the database is down), `withLogger` answers `500` with `{ "error": "Internal server error" }` and nothing else: no stack trace and no internal message. The full error and stack trace go only to the terminal and to `logs/error.log`. The log line shows `500`, and the server keeps running; when the database is back, the next request works again without a restart. Known errors (`400`, `404`, `409`, `415`) are still answered by the controllers.
+
+**Error log file.** Each unexpected error is also appended to `logs/error.log` as one entry: timestamp (UTC), method, route, message and stack trace. The `logs/` folder is created automatically, and it is git-ignored. If the file can't be written, the terminal shows `could not write .../logs/error.log`, and the client still gets its `500`. Example entry, with the database stopped:
+
+```
+=== 2026-11-18T19:54:14.467Z GET /api/users
+Message: Invalid `prisma.user.findMany()` invocation:
+Stack:
+Error [PrismaClientKnownRequestError]: ...
+    at async Object.getAll (models/User.ts:179:18)
+    at async getAll (controllers/ApiUserController.ts:27:28)
+    ...
+{ code: 'ECONNREFUSED', meta: { modelName: 'User' }, clientVersion: '7.10.0' }
+```
+
+**Generic 404 page (website).** `app/not-found.tsx` is the one "Page not found" page of the website, shown inside the normal header and footer with a link back to the home page. Next.js shows it for any unknown page URL (`/banana`) and whenever a page calls `notFound()`, which the `/users/:id` and `/announcements/:id` pages (and their `/edit` pages) do for an unknown or invalid id (`/users/9999`, `/users/abc`). The status is `404`. The API never shows this page; it keeps its JSON 404.
+
 ---
 
 ## ⚠️ Current Limitations
 
-- **The database must be running.** Users and announcements are stored in PostgreSQL, so the `db` container must be up and the migrations applied (see the Database section). Without it, the pages and the API answer with a server error. Running the seed deletes all users and announcements and inserts fake data.
+- **The database must be running.** Users and announcements are stored in PostgreSQL, so the `db` container must be up and the migrations applied (see the Database section). Without it, the pages show a server error and the API answers `500` `{ "error": "Internal server error" }`; the API works again as soon as the database is back. Running the seed deletes all users, announcements, job postings and applications and inserts fake data.
 - **No login.** Authentication is deferred, so anyone who can open the site can create, edit and delete users, on the pages and through the API.
 - **The edit form can't clear a field.** Empty fields keep their old value, so `school` can't be removed from the web form. A `PUT` through the API replaces the whole user.
 - **No search, sorting or paging** on the users list.
 - **No automated tests yet.** Routes have been checked by hand, with curl, Postman and Swagger.
+- **`logs/error.log` keeps growing.** There is no rotation or size limit. Delete the file when it gets too big; it is created again on the next error.
+- **No `logs/error.log` inside Docker.** In the `web` container the app runs as the non-root `node` user, which can't create `/app/logs`. Each unexpected error then prints `could not write /app/logs/error.log` and the full error appears only in `docker compose logs web`. The request still gets its `500`, and the server keeps running.
+- **The job posting title limit is checked by the app only.** The `title` column is `text` with no length limit, so rows written outside the app could be longer than 120 characters.
 
 ---
 
@@ -331,7 +394,7 @@ Swagger groups the routes into eight tags:
 
 ### Prerequisites
 
-- Node.js 20.9 or later (developed with Node.js 24)
+- Node.js 20.19+, 22.12+ or 24+ (Prisma 7 needs at least these versions; developed with Node.js 24)
 - npm
 
 The app needs the PostgreSQL database: Docker Desktop must be running, and a `.env` file is needed (`cp .env.example .env`). The **Database** section below has the full steps from zero (start `db`, run the migrations and the seed).
@@ -354,6 +417,7 @@ Then open:
 | http://localhost:3000/api/announcements | The announcements as JSON |
 | http://localhost:3000/api/swagger | Swagger API documentation |
 | http://localhost:3000/api/health | Health check |
+| http://localhost:3000/banana | The generic "Page not found" page (any unknown URL) |
 
 To try the API from a terminal, create a user with curl:
 
@@ -378,9 +442,9 @@ cp .env.example .env
 | `POSTGRES_USER` | The PostgreSQL user that the `db` service creates | `alumni` |
 | `POSTGRES_PASSWORD` | That user's password | `change_me` (a placeholder only; put your own secret password in `.env`) |
 | `POSTGRES_DB` | The database that the `db` service creates | `alumni` |
-| `DATABASE_URL` | Connection string used by Prisma on your computer (host `localhost`) to run migrations; keep it in sync with the three values above | `postgresql://alumni:change_me@localhost:5432/alumni` |
+| `DATABASE_URL` | Connection string used on your computer (host `localhost`) by the app (`npm run dev`), the migrations and the seed; keep it in sync with the three values above | `postgresql://alumni:change_me@localhost:5432/alumni` |
 
-- Inside Docker, `docker-compose.yml` builds the web container's own `DATABASE_URL` (host `db`) from the three `POSTGRES_*` values; it doesn't use the one in `.env`. The app doesn't read any environment variables yet.
+- Inside Docker, `docker-compose.yml` builds the web container's own `DATABASE_URL` (host `db`) from the three `POSTGRES_*` values; it doesn't use the one in `.env`. The app reads only `DATABASE_URL` (in `lib/prisma.ts`).
 - **`.env` is git-ignored and must never be committed.** It is your real, local file.
 - **`.env.example` is the committed template.** It contains only development values and no real secrets. When a new variable is needed, add it there with a comment.
 - `docker-compose.yml` has **no default user or password**, so no password is in it. If `POSTGRES_USER` or `POSTGRES_PASSWORD` is missing, Docker Compose stops with a message such as `Set POSTGRES_PASSWORD in .env (copy .env.example to .env)`. Only `POSTGRES_DB` has a default (`alumni`).
@@ -393,7 +457,7 @@ With Docker Desktop running, build and start the app in a container:
 docker compose up --build
 ```
 
-Then open http://localhost:3000 (the same URLs as above work). To stop and remove the container:
+Then open http://localhost:3000 (the same URLs as above work). The `web` container doesn't run the migrations: on a new, empty `postgres_data` volume, run them first from your computer (steps 3 and 4 of **Run the project from zero** below), otherwise the API answers `500`. The request log is in `docker compose logs web`. To stop and remove the container:
 
 ```bash
 docker compose down
@@ -469,7 +533,7 @@ The app's own users and announcements are stored in this database too, so they s
 
 A migration is a versioned SQL file that changes the database structure (for example, creates a table), so every copy of the database can be brought to the same structure step by step.
 
-The tables are defined in `prisma/schema.prisma`, and Prisma Migrate turns them into SQL in `prisma/migrations/`. The first migration, `init`, creates the `users` and `announcements` tables. Prisma runs on your computer, so it needs `DATABASE_URL` in `.env` (see Environment Variables).
+The tables are defined in `prisma/schema.prisma`, and Prisma Migrate turns them into SQL in `prisma/migrations/`. The first migration, `init`, creates the `users` and `announcements` tables; the second, `add_job_postings_applications` (Week 6), adds `job_postings` and `applications`. Prisma runs on your computer, so it needs `DATABASE_URL` in `.env` (see Environment Variables).
 
 ```bash
 docker compose up -d db        # start only the database
@@ -509,7 +573,7 @@ docker compose up -d db
 docker compose ps db
 ```
 
-**3. Run the migrations.** This applies every migration in `prisma/migrations/` that the database doesn't have yet. On a fresh database it creates the `users` and `announcements` tables.
+**3. Run the migrations.** This applies every migration in `prisma/migrations/` that the database doesn't have yet. On a fresh database it creates all four tables: `users`, `announcements`, `job_postings` and `applications`.
 
 ```bash
 npx prisma migrate deploy

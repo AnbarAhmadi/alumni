@@ -9,17 +9,10 @@ import { ApplicationModel, ConflictError, ValidationError } from "@/models/Appli
 import { JobPostingModel } from "@/models/JobPosting";
 import { UserModel } from "@/models/User";
 import { BodyParseError, parseBody } from "@/lib/parseBody";
+import { recordNotFound } from "@/lib/notFound";
 
 function errorResponse(message: string, status: number, field?: string) {
   return NextResponse.json(field ? { error: message, field } : { error: message }, { status });
-}
-
-function postingNotFound(id: string | number) {
-  return errorResponse(`Job posting "${id}" not found.`, 404);
-}
-
-function userNotFound(id: string | number) {
-  return errorResponse(`User "${id}" not found.`, 404);
 }
 
 // Ids in the URL are strings; anything that isn't a whole number matches nothing.
@@ -40,7 +33,7 @@ function handleError(err: unknown) {
 // jobPostingId in the body is ignored. A second application by the same user
 // is refused by the database's unique pair (userId, jobPostingId) → 409.
 export async function createForJob(request: Request, id: string) {
-  if (!(await JobPostingModel.getById(toId(id)))) return postingNotFound(id);
+  if (!(await JobPostingModel.getById(toId(id)))) return recordNotFound("Job posting", id);
 
   try {
     const body = await parseBody(request);
@@ -49,7 +42,7 @@ export async function createForJob(request: Request, id: string) {
     if (typeof userId !== "number" || !Number.isInteger(userId) || userId <= 0) {
       throw new ValidationError('"userId" must be a positive whole number.', "userId");
     }
-    if (!(await UserModel.getById(userId))) return userNotFound(userId);
+    if (!(await UserModel.getById(userId))) return recordNotFound("User", userId);
 
     // Only userId (and an optional status) come from the body; jobPostingId is set last, from the URL.
     const application = await ApplicationModel.create({ userId, status: body.status, jobPostingId: toId(id) });
@@ -61,14 +54,14 @@ export async function createForJob(request: Request, id: string) {
 
 // GET /api/jobs/[id]/applications → 200 | 404
 export async function getForJob(_request: Request, id: string) {
-  if (!(await JobPostingModel.getById(toId(id)))) return postingNotFound(id);
+  if (!(await JobPostingModel.getById(toId(id)))) return recordNotFound("Job posting", id);
 
   return NextResponse.json(await ApplicationModel.getAllByJobPosting(toId(id)));
 }
 
 // GET /api/users/[id]/applications → 200 | 404
 export async function getForUser(_request: Request, id: string) {
-  if (!(await UserModel.getById(toId(id)))) return userNotFound(id);
+  if (!(await UserModel.getById(toId(id)))) return recordNotFound("User", id);
 
   return NextResponse.json(await ApplicationModel.getAllByUser(toId(id)));
 }

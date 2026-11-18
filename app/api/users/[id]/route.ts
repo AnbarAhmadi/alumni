@@ -1,9 +1,10 @@
 import type { NextRequest } from "next/server";
 import { getById, remove, replace, update } from "@/controllers/ApiUserController";
+import { withLogger } from "@/lib/withLogger";
 
 type Ctx = RouteContext<"/api/users/[id]">;
 
-export const GET = async (request: NextRequest, { params }: Ctx) => getById(request, (await params).id);
-export const PUT = async (request: NextRequest, { params }: Ctx) => replace(request, (await params).id);
-export const PATCH = async (request: NextRequest, { params }: Ctx) => update(request, (await params).id);
-export const DELETE = async (request: NextRequest, { params }: Ctx) => remove(request, (await params).id);
+export const GET = withLogger(async (request: NextRequest, { params }: Ctx) => getById(request, (await params).id));
+export const PUT = withLogger(async (request: NextRequest, { params }: Ctx) => replace(request, (await params).id));
+export const PATCH = withLogger(async (request: NextRequest, { params }: Ctx) => update(request, (await params).id));
+export const DELETE = withLogger(async (request: NextRequest, { params }: Ctx) => remove(request, (await params).id));

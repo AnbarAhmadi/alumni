@@ -5,13 +5,10 @@ import { NextResponse } from "next/server";
 import { JobPostingModel, ValidationError } from "@/models/JobPosting";
 import { UserModel } from "@/models/User";
 import { BodyParseError, parseBody } from "@/lib/parseBody";
+import { recordNotFound } from "@/lib/notFound";
 
 function errorResponse(message: string, status: number, field?: string) {
   return NextResponse.json(field ? { error: message, field } : { error: message }, { status });
-}
-
-function userNotFound(id: string) {
-  return errorResponse(`User "${id}" not found.`, 404);
 }
 
 // Ids in the URL are strings; anything that isn't a whole number matches no user.
@@ -28,7 +25,7 @@ function handleError(err: unknown) {
 
 // GET /api/users/[id]/jobs → 200 | 404
 export async function getAll(_request: Request, id: string) {
-  if (!(await UserModel.getById(toId(id)))) return userNotFound(id);
+  if (!(await UserModel.getById(toId(id)))) return recordNotFound("User", id);
 
   return NextResponse.json(await JobPostingModel.getAllByUser(toId(id)));
 }
@@ -36,7 +33,7 @@ export async function getAll(_request: Request, id: string) {
 // POST /api/users/[id]/jobs → 201 | 400 | 404 | 415
 // The user always comes from the URL: any userId in the body is ignored.
 export async function create(request: Request, id: string) {
-  if (!(await UserModel.getById(toId(id)))) return userNotFound(id);
+  if (!(await UserModel.getById(toId(id)))) return recordNotFound("User", id);
 
   try {
     // userId is set last, so it replaces any userId that was sent in the body.

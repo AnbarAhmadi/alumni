@@ -1,4 +1,5 @@
 import { create, getAll } from "@/controllers/ApiAnnouncementController";
+import { withLogger } from "@/lib/withLogger";
 
-export const GET = () => getAll();
-export const POST = (request: Request) => create(request);
+export const GET = withLogger(() => getAll());
+export const POST = withLogger((request: Request) => create(request));

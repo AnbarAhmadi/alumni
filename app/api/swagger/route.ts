@@ -1,4 +1,6 @@
 // Swagger UI page, loaded from a CDN. It reads the spec from /api/swagger/openapi.json.
+import { withLogger } from "@/lib/withLogger";
+
 const SWAGGER_UI = "https://unpkg.com/swagger-ui-dist@5";
 
 const html = `<!doctype html>
@@ -18,8 +20,8 @@ const html = `<!doctype html>
   </body>
 </html>`;
 
-export function GET() {
+export const GET = withLogger(() => {
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
-}
+});

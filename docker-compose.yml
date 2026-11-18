@@ -14,7 +14,7 @@ services:
       - "3000:3000"
     environment:
       # Connection string for the db service below.
-      # NOTE: the app does not use it yet; users and announcements are still kept in memory.
+      # The app reads DATABASE_URL (via lib/prisma.ts) and keeps all its data in PostgreSQL.
       DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in .env (copy .env.example to .env)}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (copy .env.example to .env)}@db:5432/${POSTGRES_DB:-alumni}
     # Start the app only after the database passes its healthcheck.
     depends_on:

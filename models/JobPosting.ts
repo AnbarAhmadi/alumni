@@ -61,6 +61,9 @@ function isMissingUserError(err: unknown) {
 const FIELDS = ["userId", "title", "company", "city", "description"] as const;
 const TEXT_FIELDS = ["title", "company", "city", "description"] as const;
 
+// Longest allowed title, in characters (Unicode code points, as PostgreSQL counts them), after trimming.
+export const TITLE_MAX_LENGTH = 120;
+
 // Checks the fields in `input`. `required` lists fields that must be present;
 // any other field is checked only if it was sent. Returns only the known, cleaned fields.
 // Whether the user exists is decided by the database (the foreign key), see write below.
@@ -90,6 +93,10 @@ function validate(input: JobPostingInput, required: readonly (keyof JobPostingFi
       throw new ValidationError(`"${field}" must be a non-empty string.`, field);
     }
     data[field] = value.trim();
+  }
+
+  if (data.title !== undefined && Array.from(data.title).length > TITLE_MAX_LENGTH) {
+    throw new ValidationError(`"title" must be at most ${TITLE_MAX_LENGTH} characters.`, "title");
   }
 
   return data;

@@ -3,13 +3,10 @@
 import { NextResponse } from "next/server";
 import { ConflictError, UserModel, ValidationError } from "@/models/User";
 import { BodyParseError, parseBody } from "@/lib/parseBody";
+import { recordNotFound } from "@/lib/notFound";
 
 function errorResponse(message: string, status: number, field?: string) {
   return NextResponse.json(field ? { error: message, field } : { error: message }, { status });
-}
-
-function notFound(id: string) {
-  return errorResponse(`User "${id}" not found.`, 404);
 }
 
 // Ids in the URL are strings; anything that isn't a whole number matches no user.
@@ -33,7 +30,7 @@ export async function getAll(_request: Request) {
 // GET /api/users/[id] → 200 (the user with a "jobs" array) | 404
 export async function getById(_request: Request, id: string) {
   const user = await UserModel.getByIdWithJobs(toId(id));
-  if (!user) return notFound(id);
+  if (!user) return recordNotFound("User", id);
 
   return NextResponse.json(user);
 }
@@ -50,11 +47,11 @@ export async function create(request: Request) {
 
 // PATCH /api/users/[id]: only the fields sent are changed → 200 | 400 | 404 | 409 | 415
 export async function update(request: Request, id: string) {
-  if (!(await UserModel.getById(toId(id)))) return notFound(id);
+  if (!(await UserModel.getById(toId(id)))) return recordNotFound("User", id);
 
   try {
     const user = await UserModel.update(toId(id), await parseBody(request));
-    return user ? NextResponse.json(user) : notFound(id);
+    return user ? NextResponse.json(user) : recordNotFound("User", id);
   } catch (err) {
     return handleError(err);
   }
@@ -62,11 +59,11 @@ export async function update(request: Request, id: string) {
 
 // PUT /api/users/[id]: every field is required → 200 | 400 | 404 | 409 | 415
 export async function replace(request: Request, id: string) {
-  if (!(await UserModel.getById(toId(id)))) return notFound(id);
+  if (!(await UserModel.getById(toId(id)))) return recordNotFound("User", id);
 
   try {
     const user = await UserModel.replace(toId(id), await parseBody(request));
-    return user ? NextResponse.json(user) : notFound(id);
+    return user ? NextResponse.json(user) : recordNotFound("User", id);
   } catch (err) {
     return handleError(err);
   }
@@ -74,7 +71,7 @@ export async function replace(request: Request, id: string) {
 
 // DELETE /api/users/[id] → 204 (no body) | 404
 export async function remove(_request: Request, id: string) {
-  if (!(await UserModel.remove(toId(id)))) return notFound(id);
+  if (!(await UserModel.remove(toId(id)))) return recordNotFound("User", id);
 
   return new NextResponse(null, { status: 204 });
 }

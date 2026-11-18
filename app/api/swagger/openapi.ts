@@ -34,6 +34,19 @@ const errorResponse = (description: string, examples: Record<string, [string, st
   },
 });
 
+// Every 404 of the JSON API has the same shape: { "error": "Not found", "reason": "..." } (lib/notFound.ts).
+const notFoundResponse = (description: string, examples: Record<string, string>) => ({
+  description,
+  content: {
+    "application/json": {
+      schema: ref("NotFound"),
+      examples: Object.fromEntries(
+        Object.entries(examples).map(([name, reason]) => [name, { value: { error: "Not found", reason } }]),
+      ),
+    },
+  },
+});
+
 const exampleUser = {
   id: 1,
   fullName: "Ayşe Yılmaz",
@@ -62,9 +75,9 @@ const jobIdParam = {
 
 const exampleApplication = { id: 31, userId: 15, jobPostingId: 1, status: "applied", createdAt: "2026-10-22T10:00:00.000Z" };
 
-const jobNotFound = errorResponse("No job posting has this id, or (POST) no user has the userId in the body.", {
-  jobNotFound: ['Job posting "9999" not found.'],
-  userNotFound: ['User "9999" not found.'],
+const jobNotFound = notFoundResponse("No job posting has this id, or (POST) no user has the userId in the body.", {
+  jobNotFound: "Job posting 9999 does not exist",
+  userNotFound: "User 9999 does not exist",
 });
 
 const userIdParam = {
@@ -75,8 +88,8 @@ const userIdParam = {
   schema: { type: "integer", minimum: 1, example: 1 },
 };
 
-const notFound = errorResponse("No user has this id.", {
-  notFound: ['User "99" not found.'],
+const notFound = notFoundResponse("No user has this id.", {
+  notFound: "User 9999 does not exist",
 });
 
 const unsupportedType = errorResponse("The Content-Type is not JSON or form data.", {
@@ -113,8 +126,8 @@ const announcementIdParam = {
   schema: { type: "integer", minimum: 1, example: 1 },
 };
 
-const announcementNotFound = errorResponse("No announcement has this id.", {
-  notFound: ['Announcement "99" not found.'],
+const announcementNotFound = notFoundResponse("No announcement has this id.", {
+  notFound: "Announcement 9999 does not exist",
 });
 
 const announcementValidationErrors = {
@@ -123,6 +136,21 @@ const announcementValidationErrors = {
   emptyTitle: ['"title" must be a non-empty string.', "title"] as [string, string],
   invalidJson: ["Request body must be valid JSON."] as [string],
 };
+
+// Every /api handler is wrapped with withLogger (lib/withLogger.ts), which turns any
+// unexpected error into 500 { "error": "Internal server error" }. Instead of repeating
+// that in each operation, this adds the shared 500 response to every /api operation.
+const METHODS = ["get", "put", "post", "patch", "delete"] as const;
+function withServerErrors<T extends Record<string, Record<string, unknown>>>(paths: T): T {
+  for (const [path, item] of Object.entries(paths)) {
+    if (!path.startsWith("/api/")) continue;
+    for (const method of METHODS) {
+      const operation = item[method] as { responses?: Record<string, unknown> } | undefined;
+      if (operation?.responses) operation.responses[500] = { $ref: "#/components/responses/InternalServerError" };
+    }
+  }
+  return paths;
+}
 
 export const openApiSpec = {
   openapi: "3.0.3",
@@ -134,7 +162,12 @@ export const openApiSpec = {
       "For development, `npx prisma db seed` fills the database with 20 fake users and 5 fake announcements.\n\n" +
       "Write requests (POST, PUT, PATCH) accept `application/json`, `multipart/form-data` or `application/x-www-form-urlencoded`. " +
       "Any `id` in the body is ignored: ids are generated on create and taken from the URL otherwise. " +
-      "An announcement's `createdAt` is always set by the server.",
+      "An announcement's `createdAt` is always set by the server.\n\n" +
+      "Every 404 of the JSON API has the same body: `{ \"error\": \"Not found\", \"reason\": \"...\" }`. " +
+      "The reason says what was missing (`User 9999 does not exist`). Unknown paths under `/api` answer this 404 for any method, " +
+      "for example `GET /api/banana` gives `{ \"error\": \"Not found\", \"reason\": \"No route GET /api/banana\" }`.\n\n" +
+      "Any unexpected error (for example the database is down) answers `500` with `{ \"error\": \"Internal server error\" }` and no other details; " +
+      "the full error and stack trace are printed only in the server's terminal and appended to `logs/error.log`.",
   },
   tags: [
     { name: "Users", description: "JSON API for users: create, read, update and delete." },
@@ -158,7 +191,7 @@ export const openApiSpec = {
     { name: "Health", description: "Check that the API is running." },
     { name: "Examples", description: "Simple plain-text example routes." },
   ],
-  paths: {
+  paths: withServerErrors({
     "/api/users": {
       get: {
         tags: ["Users"],
@@ -266,7 +299,7 @@ export const openApiSpec = {
         tags: ["Job postings"],
         summary: "Create a job posting for a user",
         description:
-          "title and company are required; city and description are optional. " +
+          "title (at most 120 characters) and company are required; city and description are optional. " +
           "The user comes from the URL: a userId in the body is ignored. id and createdAt are set by the database.",
         requestBody: writeBody("JobPostingCreate", {
           title: "Junior Data Analyst",
@@ -278,6 +311,7 @@ export const openApiSpec = {
           201: { description: "The created job posting, with the userId from the URL.", content: json(ref("JobPosting"), exampleJobPosting) },
           400: errorResponse("The body can't be read, or a field is missing or invalid.", {
             missingTitle: ['"title" is required.', "title"],
+            titleTooLong: ['"title" must be at most 120 characters.', "title"],
             missingCompany: ['"company" is required.', "company"],
             emptyCity: ['"city" must be a non-empty string.', "city"],
             invalidJson: ["Request body must be valid JSON."],
@@ -300,7 +334,7 @@ export const openApiSpec = {
               { ...exampleApplication, user: { id: 15, fullName: "Salim Denkel" } },
             ]),
           },
-          404: errorResponse("No job posting has this id.", { jobNotFound: ['Job posting "9999" not found.'] }),
+          404: notFoundResponse("No job posting has this id.", { jobNotFound: "Job posting 9999 does not exist" }),
         },
       },
       post: {
@@ -403,7 +437,7 @@ export const openApiSpec = {
         ],
         responses: {
           200: { description: "The details page.", content: html },
-          404: { description: "No user has this id: the \"User not found\" page is shown.", content: html },
+          404: { description: "No user has this id (or the id is not a number): the generic \"Page not found\" page is shown.", content: html },
         },
       },
       post: {
@@ -424,7 +458,7 @@ export const openApiSpec = {
         description: "UserController.show -> UserModel.getById -> UserForm, prefilled with the user's current values.",
         responses: {
           200: { description: "The edit page.", content: html },
-          404: { description: "No user has this id: the \"User not found\" page is shown.", content: html },
+          404: { description: "No user has this id (or the id is not a number): the generic \"Page not found\" page is shown.", content: html },
         },
       },
       post: {
@@ -604,7 +638,7 @@ export const openApiSpec = {
         ],
         responses: {
           200: { description: "The details page.", content: html },
-          404: { description: "No announcement has this id: the \"Announcement not found\" page is shown.", content: html },
+          404: { description: "No announcement has this id (or the id is not a number): the generic \"Page not found\" page is shown.", content: html },
         },
       },
       post: {
@@ -627,7 +661,7 @@ export const openApiSpec = {
           "AnnouncementController.show -> AnnouncementModel.getById -> AnnouncementForm, prefilled with the current values.",
         responses: {
           200: { description: "The edit page.", content: html },
-          404: { description: "No announcement has this id: the \"Announcement not found\" page is shown.", content: html },
+          404: { description: "No announcement has this id (or the id is not a number): the generic \"Page not found\" page is shown.", content: html },
         },
       },
       post: {
@@ -700,8 +734,16 @@ export const openApiSpec = {
         },
       },
     },
-  },
+  }),
   components: {
+    responses: {
+      InternalServerError: {
+        description:
+          "Unexpected server error, for example the database is down. The body never contains a stack trace or an internal message; " +
+          "the full error is printed only in the server's terminal and in logs/error.log.",
+        content: json(ref("InternalServerError"), { error: "Internal server error" }),
+      },
+    },
     schemas: {
       User: {
         type: "object",
@@ -796,7 +838,7 @@ export const openApiSpec = {
         properties: {
           id: { type: "integer", example: 26 },
           userId: { type: "integer", description: "The user who posted it (from the URL).", example: 1 },
-          title: { type: "string", example: "Junior Data Analyst" },
+          title: { type: "string", maxLength: 120, example: "Junior Data Analyst" },
           company: { type: "string", example: "Example Analytics" },
           city: { type: "string", description: "Optional; left out when empty.", example: "Istanbul" },
           description: { type: "string", description: "Optional long text; left out when empty." },
@@ -808,10 +850,10 @@ export const openApiSpec = {
         description: "userId is not sent: it comes from the URL, and one in the body is ignored.",
         required: ["title", "company"],
         properties: {
-          title: { type: "string", minLength: 1 },
-          company: { type: "string", minLength: 1 },
-          city: { type: "string", minLength: 1 },
-          description: { type: "string", minLength: 1 },
+          title: { type: "string", minLength: 1, maxLength: 120, description: "Required; at most 120 characters after trimming." },
+          company: { type: "string", minLength: 1, description: "Required." },
+          city: { type: "string", minLength: 1, description: "Optional." },
+          description: { type: "string", minLength: 1, description: "Optional long text; no length limit." },
         },
       },
       Application: {
@@ -866,6 +908,23 @@ export const openApiSpec = {
         properties: {
           error: { type: "string", description: "What went wrong." },
           field: { type: "string", description: "The field that failed validation, if any." },
+        },
+      },
+      NotFound: {
+        type: "object",
+        description: "The body of every 404 from the JSON API, including unknown /api paths.",
+        required: ["error", "reason"],
+        properties: {
+          error: { type: "string", enum: ["Not found"], example: "Not found" },
+          reason: { type: "string", description: "What was missing.", example: "User 9999 does not exist" },
+        },
+      },
+      InternalServerError: {
+        type: "object",
+        description: "The body of every 500 from the JSON API. It never contains internal details.",
+        required: ["error"],
+        properties: {
+          error: { type: "string", enum: ["Internal server error"], example: "Internal server error" },
         },
       },
     },
