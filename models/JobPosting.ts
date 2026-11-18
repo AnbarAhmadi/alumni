@@ -120,6 +120,21 @@ export const JobPostingModel = {
     return rows.map(toJobPosting);
   },
 
+  // The newest postings first, at most `limit` of them (read-only; used by the homepage).
+  async getLatest(limit: number): Promise<JobPosting[]> {
+    const rows = await prisma.jobPosting.findMany({
+      select: SELECT,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit,
+    });
+    return rows.map(toJobPosting);
+  },
+
+  // How many job postings there are (read-only; used by the homepage).
+  async count(): Promise<number> {
+    return prisma.jobPosting.count();
+  },
+
   // The postings of one user, oldest first. An unknown user simply has none.
   async getAllByUser(userId: number): Promise<JobPosting[]> {
     if (!isValidId(userId)) return [];

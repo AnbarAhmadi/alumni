@@ -1,23 +1,38 @@
-import type { User } from "@/models/User";
+import type { UserWithStatus } from "@/models/User";
 
-// One user shown as key/value pairs.
-export default function UserDetails({ user }: { user: User }) {
-  const rows: [string, string | number][] = [
-    ["ID", user.id],
-    ["Full name", user.fullName],
-    ["Email", user.email],
-    ["Age", user.age],
-    ["School", user.school ?? "—"],
-  ];
+// "Şelale Öztürk" -> "ŞÖ": the first letter of the first and the last name,
+// uppercased with Turkish rules (i -> İ).
+function initials(fullName: string) {
+  const parts = fullName.trim().split(/\s+/);
+  const letters = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : parts;
+  return letters.map((part) => part.charAt(0).toLocaleUpperCase("tr-TR")).join("");
+}
 
+// The profile header: initials avatar, the name in large serif, and the user's details.
+export default function UserDetails({ user }: { user: UserWithStatus }) {
   return (
-    <dl className="details">
-      {rows.map(([label, value]) => (
-        <div key={label}>
-          <dt>{label}</dt>
-          <dd>{value}</dd>
+    <div className="profile">
+      <div className="profile-head">
+        <span className="avatar" aria-hidden="true">{initials(user.fullName)}</span>
+        <div>
+          <h1 id="profile-title">{user.fullName}</h1>
+          {user.isAlumni && <span className="badge">Alumni</span>}
         </div>
-      ))}
-    </dl>
+      </div>
+      <dl className="facts">
+        <div>
+          <dt>Email</dt>
+          <dd>{user.email}</dd>
+        </div>
+        <div>
+          <dt>School</dt>
+          <dd>{user.school ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>Graduation year</dt>
+          <dd>{user.graduationYear ?? "—"}</dd>
+        </div>
+      </dl>
+    </div>
   );
 }

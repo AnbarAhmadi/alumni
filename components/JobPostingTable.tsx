@@ -1,9 +1,11 @@
 import type { JobPosting } from "@/models/JobPosting";
+import EmptyState from "./EmptyState";
 
-// A user's job postings as a table (title, company, city), or a short message if there are none.
+// A user's job postings as a table (title, company, city; DESIGN.md ref-2),
+// or the empty state (ref-3) if there are none.
 export default function JobPostingTable({ jobs }: { jobs: JobPosting[] }) {
   if (jobs.length === 0) {
-    return <p className="empty">No job postings yet.</p>;
+    return <EmptyState message="No postings yet." />;
   }
 
   return (
@@ -11,9 +13,9 @@ export default function JobPostingTable({ jobs }: { jobs: JobPosting[] }) {
       <table className="table">
         <thead>
           <tr>
-            <th>Title</th>
-            <th>Company</th>
-            <th>City</th>
+            <th scope="col">Title</th>
+            <th scope="col">Company</th>
+            <th scope="col">City</th>
           </tr>
         </thead>
         <tbody>
@@ -21,7 +23,7 @@ export default function JobPostingTable({ jobs }: { jobs: JobPosting[] }) {
             <tr key={job.id}>
               <td>{job.title}</td>
               <td>{job.company}</td>
-              <td>{job.city ?? "—"}</td>
+              <td>{job.city ?? <span className="muted">—</span>}</td>
             </tr>
           ))}
         </tbody>

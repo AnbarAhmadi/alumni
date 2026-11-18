@@ -1,8 +1,8 @@
-# Alumni Tracking System
+# Homecoming
 
 **Management Information Systems Department — Istanbul University**
 
-> A full-stack web platform that keeps universities connected to their graduates, built from scratch as a semester-long project for the Web Programming course.
+> **Where our graduates are now.** Homecoming is the alumni tracking system of the department: a full-stack web platform that keeps the university connected to its graduates, built from scratch as a semester-long project for the Web Programming course.
 
 Data design: see [ddd.md](ddd.md)
 
@@ -10,7 +10,7 @@ Data design: see [ddd.md](ddd.md)
 
 ## 📖 About
 
-The Web-Based Alumni Tracking System is a centralized platform built to strengthen the connection between Istanbul University and its graduates, since universities frequently lose contact with students after graduation. It aims to replace scattered, department-by-department record-keeping with one central database, keep alumni information current through user-driven profile updates, and help current students and graduates connect for mentorship and professional networking.
+Homecoming, the web-based alumni tracking system, is a centralized platform built to strengthen the connection between Istanbul University and its graduates, since universities frequently lose contact with students after graduation. It aims to replace scattered, department-by-department record-keeping with one central database, keep alumni information current through user-driven profile updates, and help current students and graduates connect for mentorship and professional networking.
 
 All project decisions and progress, including architecture, design and each round of development, are documented and version-controlled in this repository as the semester unfolds.
 
@@ -32,6 +32,7 @@ This project is being built incrementally over the semester. Status is updated w
 - [x] **Week 5:** Docker setup (Dockerfile and Docker Compose), a PostgreSQL container with a persistent volume, and the data design documentation (`ddd.md`)
 - [x] **Week 6:** Job postings and applications: two new tables (migration and seed), their API (`/api/users/:id/jobs`, `/api/jobs/:id/applications`, `/api/users/:id/applications`) and a user's job postings on the `/users/:id` page
 - [x] **Week 7:** Validation rules for job postings (title required, at most 120 characters), a request logger (`withLogger`), one JSON 404 shape with a reason for the whole API (with a catch-all route), a safe `500` answer for unexpected errors, an error log file (`logs/error.log`) and one generic 404 page for the website
+- [x] **Week 9:** A design system and a new look under the name **Homecoming**: a brand kit ([BRAND.md](BRAND.md)) and design rules ([DESIGN.md](DESIGN.md)), one stylesheet built from CSS variables, one shared layout, a livelier homepage with real numbers and the latest announcements and job postings, redesigned users, announcements and About pages, designed 404 and 500 pages, subtle motion (off for `prefers-reduced-motion`), and one of each component (card, button hover, link, table, form, empty state)
 
 ### Upcoming
 
@@ -74,10 +75,12 @@ Every file that is committed to the repository, with what it does:
 ```
 alumni/
 ├── app/                                  # Next.js App Router: a file's folder path is its URL
-│   ├── layout.tsx                        # Wraps every page: site header, navigation links and footer
-│   ├── page.tsx                          # Home page (/): hero section and the "Explore" cards
-│   ├── not-found.tsx                     # The one 404 page of the website: unknown URLs (/banana) and unknown ids (/users/9999) (Week 7)
-│   ├── globals.css                       # Styles for the whole site, including the /users pages
+│   ├── layout.tsx                        # The one layout: "Homecoming" wordmark, navigation, one centred column, footer; loads the fonts
+│   ├── page.tsx                          # Home page (/): hero band, real counts (count up once), the 3 newest announcements and job postings, "Coming soon"
+│   ├── not-found.tsx                     # The one 404 page of the website: unknown URLs (/banana) and unknown ids (/users/9999) (Week 7, designed in Week 9)
+│   ├── error.tsx                         # The 500 page of the website (inside the layout): "Something went wrong on our side.", Try again (Week 9)
+│   ├── global-error.tsx                  # The 500 page used only if the root layout itself fails; brings its own <html>, styles and fonts (Week 9)
+│   ├── globals.css                       # The one stylesheet, built from the DESIGN.md variables (colours, fonts, spacing, radius)
 │   ├── about/
 │   │   └── page.tsx                      # About page (/about): what the system is for
 │   ├── users/                            # The users web pages (HTML)
@@ -137,21 +140,27 @@ alumni/
 │   ├── ApiUserController.ts              # For /api/users: calls UserModel and returns JSON with status codes
 │   ├── ApiUserJobController.ts           # For /api/users/:id/jobs: a user's job postings (JobPostingModel), JSON with status codes
 │   ├── ApiApplicationController.ts       # For /api/jobs/:id/applications and /api/users/:id/applications (409 for a repeat)
-│   ├── UserController.ts                 # For /users: calls UserModel and returns { ok, data, error, field }
+│   ├── UserController.ts                 # For the /users forms and the edit page: calls UserModel and returns { ok, data, error, field }
 │   ├── ApiAnnouncementController.ts      # For /api/announcements: calls AnnouncementModel and returns JSON with status codes
-│   └── AnnouncementController.ts         # For /announcements: calls AnnouncementModel and returns { ok, data, error, field }
+│   ├── AnnouncementController.ts         # For /announcements: calls AnnouncementModel and returns { ok, data, error, field }
+│   ├── HomeController.ts                 # For /: read-only counts and the newest announcements and job postings (Week 9)
+│   └── UserDirectoryController.ts        # For /users and /users/:id: read-only users with their alumni status (Week 9)
 ├── components/                           # VIEWS (React components)
-│   ├── UserTable.tsx                     # Table of users with View, Edit and Delete; "Added <name>" notice
-│   ├── UserDetails.tsx                   # One user as label/value rows
+│   ├── UserTable.tsx                     # Table of users: name (link), email, school, alumni badge, graduation year, Edit, Delete
+│   ├── UserDetails.tsx                   # Profile header: initials avatar, name, alumni badge, email, school, graduation year
 │   ├── UserForm.tsx                      # Create and edit form; shows errors under the right field (client component)
 │   ├── DeleteUserButton.tsx              # Delete button that asks "Delete <name>?" first (client component)
-│   ├── UserNav.tsx                       # Links: All users, Details, Edit, + New user
-│   ├── JobPostingTable.tsx               # A user's job postings (title, company, city), or "No job postings yet."
-│   ├── AnnouncementTable.tsx             # Table of announcements with View, Edit and Delete; "Added" notice
-│   ├── AnnouncementDetails.tsx           # One announcement as label/value rows; formats the createdAt date
-│   ├── AnnouncementForm.tsx              # Create and edit form with a content box; errors under the right field (client component)
-│   ├── DeleteAnnouncementButton.tsx      # Reuses DeleteUserButton with the announcement title in the confirmation
-│   └── AnnouncementNav.tsx               # Links: All announcements, Details, Edit, + New announcement
+│   ├── StatusPage.tsx                    # The shared look of the 404 and 500 pages: large serif code, one line, buttons
+│   ├── EmptyState.tsx                    # The one empty state: a dashed frame, one sentence, an optional button
+│   ├── CountUp.tsx                       # The homepage numbers: count up once (client component; the final number works without JS)
+│   ├── SiteHeader.tsx                    # The header: the "Homecoming" wordmark and the navigation (layout and global-error)
+│   ├── SiteFooter.tsx                    # The footer (layout and global-error)
+│   ├── friendlyError.ts                  # Turns model messages into plain form messages ("fullName" is required. -> Full name is required.)
+│   ├── JobPostingTable.tsx               # A user's job postings (title, company, city), or "No postings yet."
+│   ├── AnnouncementList.tsx              # Announcements as cards, newest first: date badge, title, 2-line preview, Read more, Edit, Delete
+│   ├── AnnouncementDetails.tsx           # One announcement's date and full message; formats the createdAt date
+│   ├── AnnouncementForm.tsx              # Create and edit form: labels above fields, errors under the right field (client component)
+│   └── DeleteAnnouncementButton.tsx      # Reuses DeleteUserButton with the announcement title in the confirmation
 ├── lib/                                  # Helpers shared by the routes, controllers and models
 │   ├── notFound.ts                       # The one JSON 404 answer of the API: { "error": "Not found", "reason": "..." } (Week 7)
 │   ├── parseBody.ts                      # Reads JSON, multipart/form-data and urlencoded bodies; turns age and ids into numbers
@@ -185,6 +194,19 @@ alumni/
 ├── AGENTS.md                             # Notes for AI coding tools about this Next.js version (written by next dev)
 ├── CLAUDE.md                             # Points to AGENTS.md
 ├── ddd.md                                # Data design: data dictionary, types, validation, ER diagram, planned database
+├── BRAND.md                              # Brand kit (Week 9): name, colours, type, shape, voice and wordmark
+├── DESIGN.md                             # Design rules (Week 9): references, CSS variables and page rules, based on BRAND.md
+├── docs/
+│   └── design/                           # Screenshots of the site's design
+│       ├── before-users.png              # /users before the Week 9 design change
+│       ├── before-user.png               # /users/1 before the Week 9 design change
+│       ├── after-home.png                # The new homepage, with the hero band and the real numbers (Week 9)
+│       ├── after-announcements.png       # The new /announcements list (Week 9)
+│       ├── after-announcement.png        # The new announcement page, /announcements/:id (Week 9)
+│       ├── after-users.png               # The new /users table (Week 9)
+│       ├── after-user.png                # The new profile page, /users/:id (Week 9)
+│       ├── after-404.png                 # The new 404 page, /banana (Week 9)
+│       └── after-500.png                 # The new 500 page, /users with the database stopped (Week 9)
 └── README.md                             # This file
 ```
 
@@ -204,12 +226,13 @@ The app follows **MVC (Model–View–Controller)**. Each part has one job:
 
 In Next.js the `app/` folder is the router: where a file is decides its URL. The route and page files are kept thin, so they only pass the request to a controller. The small routes with no data (`/api/health`, `/api/swagger`, `/hello`, `/sum`) answer directly. Every handler under `app/api/` is wrapped with `withLogger` (Week 7), which logs the request and turns an unexpected error into a safe `500` (see Logging and Error Handling).
 
-There are **two controllers** for the **same model**, because the two kinds of client need different answers:
+Users have **three controllers** for the **same model**, because the clients need different answers:
 
 - **`ApiUserController`** is for programs (curl, Postman, Swagger). It returns JSON with HTTP status codes (`200`, `201`, `204`, `400`, `404`, `409`, `415`); an unexpected error becomes `500` in `withLogger`.
-- **`UserController`** is for the web pages. It returns a result object `{ ok, data, error, field }`, and the page decides which view to show.
+- **`UserController`** is for the web forms (create, edit, delete) and the edit page. It returns a result object `{ ok, data, error, field }`, and the page decides which view to show.
+- **`UserDirectoryController`** (Week 9) only reads: the `/users` table and the `/users/:id` profile, with the alumni status. `HomeController` does the same for the homepage numbers and latest items.
 
-Both controllers reach the data only through `UserModel`, which stores it in PostgreSQL. Moving from memory to the database changed only the model files, plus `await` in the controllers, pages and server actions that call them.
+All of them reach the data only through `UserModel`, which stores it in PostgreSQL. Moving from memory to the database changed only the model files, plus `await` in the controllers, pages and server actions that call them.
 
 ### Example: how a request travels through MVC
 
@@ -231,11 +254,11 @@ Announcements (`title`, `content`, optional `author`, and a `createdAt` date set
 | --- | --- | --- |
 | Model | `models/User.ts` (`UserModel`) | `models/Announcement.ts` (`AnnouncementModel`) |
 | API controller | `ApiUserController` | `ApiAnnouncementController` |
-| Web controller | `UserController` | `AnnouncementController` |
+| Web controller | `UserController` (forms, edit page), `UserDirectoryController` (list, profile; read-only) | `AnnouncementController` |
 | Server actions | `app/users/actions.ts` | `app/announcements/actions.ts` |
-| Views | `UserTable`, `UserDetails`, `UserForm`, `DeleteUserButton`, `UserNav` | `AnnouncementTable`, `AnnouncementDetails`, `AnnouncementForm`, `DeleteAnnouncementButton`, `AnnouncementNav` |
+| Views | `UserTable`, `UserDetails`, `UserForm`, `DeleteUserButton`, `JobPostingTable` | `AnnouncementList`, `AnnouncementDetails`, `AnnouncementForm`, `DeleteAnnouncementButton` |
 
-Both models have the same functions (`getAll`, `getById`, `create`, `update`, `replace`, `remove`) and throw the same `ValidationError`, so the controllers handle errors the same way.
+Both models have the same CRUD functions (`getAll`, `getById`, `create`, `update`, `replace`, `remove`) and throw the same `ValidationError`, so the controllers handle errors the same way. Week 9 added read-only functions for the pages: `count` (users, announcements, job postings), `getLatest` (announcements, job postings), and `getAllWithStatus` and `getProfile` (users with their alumni status).
 
 ---
 
@@ -245,23 +268,23 @@ Both models have the same functions (`getAll`, `getById`, `create`, `update`, `r
 
 | URL | Method | What it shows or does |
 | --- | --- | --- |
-| `/` | GET | Home page with the "Explore" cards |
-| `/about` | GET | About the Alumni System |
-| `/users` | GET | Table of all users and the "Add a user" form |
+| `/` | GET | Home page: a hero band, the number of users, announcements and job postings (read from the database), the 3 newest announcements and job postings, and a "Coming soon" line. If the database can't be reached, it still shows, with a short message instead of the numbers |
+| `/about` | GET | About Homecoming: why it exists, what you can do today, what comes next |
+| `/users` | GET | Table of all users (name, email, school, alumni badge, graduation year) , a count line ("20 users, 12 of them alumni."), and the "Add a user" form; "No users yet. Add the first one." when there are none |
 | `/users` | POST (form) | Add a user, or delete one from a table row |
-| `/users/:id` | GET | One user's details, with Edit and Delete buttons, and a table of their job postings ("No job postings yet." if none) |
+| `/users/:id` | GET | The user's profile (initials avatar, name, email, school, graduation year) with Edit and Delete, and a table of their job postings ("No postings yet." if none) |
 | `/users/:id` | POST (form) | Delete the user |
 | `/users/:id/edit` | GET | Edit form filled with the user's data |
 | `/users/:id/edit` | POST (form) | Save changes (only the filled-in fields change) |
-| `/announcements` | GET | Table of all announcements and the "Add an announcement" form |
-| `/announcements` | POST (form) | Add an announcement, or delete one from a table row |
-| `/announcements/:id` | GET | One announcement's details, with Edit and Delete buttons |
+| `/announcements` | GET | A count line ("5 announcements."), the announcements as cards, newest first (date, title, 2-line preview, Read more), and the "Post an announcement" form; "No announcements yet. Post the first one." when there are none |
+| `/announcements` | POST (form) | Post an announcement, or delete one from its card |
+| `/announcements/:id` | GET | One announcement: title, date and full message, a link back to the list, and Edit and Delete buttons |
 | `/announcements/:id` | POST (form) | Delete the announcement |
 | `/announcements/:id/edit` | GET | Edit form filled with the announcement's data |
 | `/announcements/:id/edit` | POST (form) | Save changes (only the filled-in fields change) |
-| Any other URL, for example `/banana` | GET | The generic "Page not found" page, with status `404` (Week 7) |
+| Any other URL, for example `/banana` | GET | The 404 page: "404", "There is no page at this address." and a button back to the home page, with status `404` |
 
-The `POST` rows are form submissions handled by server actions. An unknown or invalid id (`/users/9999`, `/users/abc`, also on the `/edit` pages and for announcements) and any unknown page URL (`/banana`) show the generic "Page not found" page (`app/not-found.tsx`, Week 7) with a `404` status and a link back to the home page. The JSON API keeps its own JSON 404.
+The `POST` rows are form submissions handled by server actions. An unknown or invalid id (`/users/9999`, `/users/abc`, also on the `/edit` pages and for announcements) and any unknown page URL (`/banana`) show the 404 page (`app/not-found.tsx`) with a `404` status and a button back to the home page. If a page fails on the server (for example the database is down), the 500 page (`app/error.tsx`) is shown instead, with status `500`. The JSON API keeps its own JSON 404 and 500.
 
 ### JSON API
 
@@ -373,13 +396,42 @@ Error [PrismaClientKnownRequestError]: ...
 { code: 'ECONNREFUSED', meta: { modelName: 'User' }, clientVersion: '7.10.0' }
 ```
 
-**Generic 404 page (website).** `app/not-found.tsx` is the one "Page not found" page of the website, shown inside the normal header and footer with a link back to the home page. Next.js shows it for any unknown page URL (`/banana`) and whenever a page calls `notFound()`, which the `/users/:id` and `/announcements/:id` pages (and their `/edit` pages) do for an unknown or invalid id (`/users/9999`, `/users/abc`). The status is `404`. The API never shows this page; it keeps its JSON 404.
+**404 page (website).** `app/not-found.tsx` is the one 404 page of the website, shown inside the normal header and footer: a large serif "404", "There is no page at this address." and a "Back to the home page" button (Week 9 design). Next.js shows it for any unknown page URL (`/banana`) and whenever a page calls `notFound()`, which the `/users/:id` and `/announcements/:id` pages (and their `/edit` pages) do for an unknown or invalid id (`/users/9999`, `/users/abc`). The status is `404`. The API never shows this page; it keeps its JSON 404.
+
+**500 page (website, Week 9).** `app/error.tsx` is shown inside the header and footer when a page fails on the server, for example `/users` while the database is stopped: a large serif "500", "Something went wrong on our side.", a "Try again" button and a link home. The status is `500`. It never shows the error message, a digest or a stack trace; the full error is only in the server's terminal. "Try again" calls Next.js's `retry()`, which fetches the page again, so it works as soon as the database is back. `app/global-error.tsx` is the same page for the rare case where the root layout itself fails. The pages share `components/StatusPage.tsx`. In development (`npm run dev`), Next.js shows its own error overlay with the stack instead; the 500 page is what visitors see in production.
+
+---
+
+## Design
+
+The [Brand kit](BRAND.md) sets the look of **Homecoming** (Week 9): the name and promise, the colours, fonts, shapes, voice, wordmark and motion. The [Design rules](DESIGN.md) say how the pages use it: three references (layout, table, empty state), the CSS variables for `:root`, and the rules for the layout, the stylesheet and the components (one card, one button hover, one standalone link, one table, one form width, one empty state). Motion is subtle: the page content fades in, cards and table rows enter one after another, cards lift 2px on hover, link underlines slide in, buttons change colour and shrink slightly when pressed, and the homepage numbers count up once; people with `prefers-reduced-motion: reduce` get no movement. In the website forms, errors are shown in plain words ("Full name is required."); the JSON API keeps its own messages.
+
+### Before and after
+
+Screenshots (1440 px wide, full page) are in [docs/design/](docs/design/).
+
+| Before | After |
+| --- | --- |
+| ![The /users page before the redesign](docs/design/before-users.png) | ![The /users page after the redesign](docs/design/after-users.png) |
+| `/users` | `/users` |
+| ![A user's page before the redesign](docs/design/before-user.png) | ![A user's profile after the redesign](docs/design/after-user.png) |
+| `/users/1` | `/users/1` |
+
+New pages, after:
+
+| Homepage | Announcements | One announcement |
+| --- | --- | --- |
+| ![The new homepage](docs/design/after-home.png) | ![The new announcements list](docs/design/after-announcements.png) | ![The new announcement page](docs/design/after-announcement.png) |
+
+| 404 page | 500 page |
+| --- | --- |
+| ![The 404 page](docs/design/after-404.png) | ![The 500 page](docs/design/after-500.png) |
 
 ---
 
 ## ⚠️ Current Limitations
 
-- **The database must be running.** Users and announcements are stored in PostgreSQL, so the `db` container must be up and the migrations applied (see the Database section). Without it, the pages show a server error and the API answers `500` `{ "error": "Internal server error" }`; the API works again as soon as the database is back. Running the seed deletes all users, announcements, job postings and applications and inserts fake data.
+- **The database must be running.** Users and announcements are stored in PostgreSQL, so the `db` container must be up and the migrations applied (see the Database section). Without it, the pages show the 500 page (the homepage still shows, without its numbers) and the API answers `500` `{ "error": "Internal server error" }`; both work again as soon as the database is back. Running the seed deletes all users, announcements, job postings and applications and inserts fake data.
 - **No login.** Authentication is deferred, so anyone who can open the site can create, edit and delete users, on the pages and through the API.
 - **The edit form can't clear a field.** Empty fields keep their old value, so `school` can't be removed from the web form. A `PUT` through the API replaces the whole user.
 - **No search, sorting or paging** on the users list.

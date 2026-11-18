@@ -1,223 +1,392 @@
+/* The one stylesheet of the website (DESIGN.md rule 2).
+   Values come only from the variables below (BRAND.md and DESIGN.md):
+   colours, fonts, spacing and radius are always var(--...), and there are no shadows. */
+
 :root {
-  --navy: #0b2545;
-  --navy-light: #13315c;
-  --gold: #e0a526;
-  --bg: #f4f6fb;
-  --card: #ffffff;
-  --text: #1c2536;
-  --muted: #5b6678;
-  --border: #dde3ee;
+  /* Colour (BRAND.md) */
+  --color-paper: #F6F4EE;   /* page background */
+  --color-ink: #162033;     /* text and headings */
+  --color-action: #2F5D50;  /* buttons and links */
+  --color-accent: #D9A441;  /* small highlights only, never text (2.04:1 on paper) */
+  --color-danger: #B3261E;  /* delete buttons and error messages */
+
+  /* Mixed from the brand colours, not new colours */
+  --color-muted: color-mix(in srgb, var(--color-ink) 70%, var(--color-paper));     /* secondary text and input borders, 5.77:1 on paper */
+  --color-line: color-mix(in srgb, var(--color-ink) 15%, var(--color-paper));      /* dividers only */
+  --color-highlight: color-mix(in srgb, var(--color-accent) 25%, var(--color-paper)); /* background of notices, badges and a new table row; ink text on it */
+  --color-tint: color-mix(in srgb, var(--color-ink) 5%, var(--color-paper));          /* background of a table row under the pointer; ink text on it */
+
+  /* Type (BRAND.md). The font files are loaded by next/font in app/layout.tsx,
+     which sets --font-source-serif-4 and --font-inter on <html>. */
+  --font-heading: var(--font-source-serif-4), Georgia, serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-size-h1: 40px;     /* page title */
+  --font-size-h2: 28px;     /* section heading */
+  --font-size-h3: 20px;     /* smaller heading */
+  --font-size-body: 16px;   /* normal text */
+  --font-size-small: 14px;  /* table headers, hints, small print */
+
+  /* Shape (BRAND.md) */
+  --radius: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 40px;
+
+  /* Motion (BRAND.md) */
+  --motion-fast: 150ms;     /* hover and press */
+  --motion-base: 250ms;     /* cards and rows entering, link underline, count-up */
+  --motion-slow: 300ms;     /* page entrance only */
+  --motion-stagger: 50ms;   /* the gap between cards or rows entering, at most 6 steps */
+  --ease: ease-out;
+
+  /* Layout (DESIGN.md ref-1) */
+  --content-width: 1200px;
+
+  /* Sizes (DESIGN.md) */
+  --reading-width: 760px;     /* text-heavy pages and detail pages: about 75 characters per line */
+  --form-width: 560px;        /* every form */
+  --avatar-size: 80px;        /* the initials avatar */
+  --avatar-size-small: 64px;  /* the initials avatar on phones */
+  --hero-title-width: 16em;   /* the hero heading wraps before it gets too long */
+  --hero-text-width: 36em;    /* the hero line */
+  --facts-column-min: 200px;  /* the profile's label / value columns */
 }
 
-* {
+/* ---------- Base ---------- */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-ink);
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+}
+
+h3 {
+  font-size: var(--font-size-h3);
 }
 
 a {
-  color: inherit;
+  color: var(--color-action);
+  text-underline-offset: 3px;
 }
 
-/* Header */
-.site-header {
-  background: var(--navy);
-  color: #fff;
-  border-bottom: 4px solid var(--gold);
+a:hover {
+  text-decoration-thickness: 2px;
 }
 
-.site-header .inner {
-  max-width: 1100px;
+:focus-visible {
+  outline: 2px solid var(--color-action);
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-3);
+  top: calc(-1 * var(--space-5) * 2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.skip-link:focus {
+  top: var(--space-3);
+}
+
+/* ---------- Layout (DESIGN.md rule 1) ---------- */
+
+.column {
+  width: 100%;
+  max-width: var(--content-width);
   margin: 0 auto;
-  padding: 0.9rem 1rem;
+  padding: 0 var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .column {
+    padding: 0 var(--space-4);
+  }
+}
+
+/* <main>: a grid with one centred content track (aligned with the header and footer)
+   and two side tracks. Every page sits in the content track; a section with the
+   class "full-bleed" spans the full width (DESIGN.md rule 1). */
+.page {
+  --gutter: var(--space-3);
+  flex: 1;
+  display: grid;
+  grid-template-columns:
+    [full-start] minmax(var(--gutter), 1fr)
+    [content-start] minmax(0, calc(var(--content-width) - 2 * var(--space-4)))
+    [content-end] minmax(var(--gutter), 1fr) [full-end];
+  align-content: start;
+  row-gap: var(--space-5);
+  padding-top: var(--space-5);
+  padding-bottom: var(--space-5);
+}
+
+@media (min-width: 768px) {
+  .page {
+    --gutter: var(--space-4);
+  }
+}
+
+.page > * {
+  grid-column: content;
+  min-width: 0;
+}
+
+.page > .full-bleed {
+  grid-column: full;
+}
+
+.site-header {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.site-header-inner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
 }
 
-.logo {
-  font-weight: 700;
-  font-size: 1.15rem;
+/* The wordmark (BRAND.md Mark): the word Homecoming in the heading font. */
+.wordmark {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-h2);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-ink);
   text-decoration: none;
 }
 
-.logo span {
-  color: var(--gold);
-}
-
-.nav {
+.site-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: var(--space-1) var(--space-3);
 }
 
-.nav a {
+.site-nav a {
+  padding: var(--space-1) 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-small);
+  font-weight: 500;
   text-decoration: none;
-  padding: 0.4rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  opacity: 0.9;
 }
 
-.nav a:hover {
-  background: var(--navy-light);
-  opacity: 1;
+.site-nav a:hover {
+  color: var(--color-action);
 }
 
-/* Hero */
-.hero {
-  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 60%, #1d4e89 100%);
-  color: #fff;
-  padding: 4rem 1rem 4.5rem;
-  text-align: center;
+.site-footer {
+  padding: var(--space-5) 0;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: var(--font-size-small);
 }
 
-.hero h1 {
-  margin: 0 0 0.5rem;
-  font-size: clamp(1.8rem, 4vw, 2.8rem);
+/* ---------- Shared building blocks ---------- */
+
+.stack {
+  display: grid;
+  gap: var(--space-5);
 }
 
-.hero .subtitle {
-  margin: 0 0 1rem;
-  color: var(--gold);
-  font-weight: 600;
+/* Let wide content (a table) scroll inside its own wrapper instead of widening the page. */
+.stack > * {
+  min-width: 0;
 }
 
-.hero p {
-  max-width: 640px;
-  margin: 0 auto;
-  opacity: 0.9;
-}
-
-/* Main content */
-.container {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 3rem 1rem;
+.muted {
+  color: var(--color-muted);
 }
 
 .section-title {
-  margin: 0 0 1.5rem;
-  font-size: 1.5rem;
-  color: var(--navy);
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-h2);
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 1.25rem;
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
-.card {
-  display: block;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-top: 4px solid var(--gold);
-  border-radius: 10px;
-  padding: 1.25rem;
-}
-
-.card-link {
-  text-decoration: none;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.card-link:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(11, 37, 69, 0.12);
-}
-
-.card .icon {
-  font-size: 1.8rem;
-}
-
-.card h3 {
-  margin: 0.5rem 0 0.35rem;
-  color: var(--navy);
-}
-
-.card p {
+.page-header .section-title {
   margin: 0;
-  color: var(--muted);
-  font-size: 0.95rem;
+}
+
+/* The one card (DESIGN.md): a bordered box for list items, latest items and form sections. */
+.card {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+/* The announcement that was just posted. */
+.card.is-new {
+  border-color: var(--color-accent);
+  background: var(--color-highlight);
+}
+
+.card .badge {
+  margin: 0 0 var(--space-2);
+}
+
+/* The one card title: an h2 or h3 at the smallest heading size. */
+.card-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-h3);
+}
+
+.card-title a {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.card-title a:hover {
+  color: var(--color-action);
+}
+
+/* The text under a card title. */
+.card-text {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-small);
+}
+
+.card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.notice {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-left: var(--space-1) solid var(--color-accent);
+  border-radius: var(--radius);
+  background: var(--color-highlight);
+  color: var(--color-ink);
+  font-weight: 500;
 }
 
 .badge {
   display: inline-block;
-  margin-top: 0.75rem;
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
-  background: #eef1f7;
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 600;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-highlight);
+  color: var(--color-ink);
+  font-size: var(--font-size-small);
+  font-weight: 500;
 }
 
-.badge.live {
-  background: #fdf3dc;
-  color: #8a6210;
+/* ---------- Buttons ---------- */
+
+.button {
+  display: inline-block;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-action);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-action);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  line-height: 1.5;
+  text-decoration: none;
+  cursor: pointer;
 }
 
-/* About page */
-.prose {
-  max-width: 760px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 2rem;
+.button.primary {
+  background: var(--color-action);
+  color: var(--color-paper);
 }
 
-.prose h1 {
-  margin-top: 0;
-  color: var(--navy);
+.button.danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 
-.prose h2 {
-  color: var(--navy);
-  font-size: 1.2rem;
-  margin-top: 1.75rem;
+/* On the action-green hero band: filled paper (action text, 6.81:1) and outlined paper. */
+.button.paper {
+  border-color: var(--color-paper);
+  background: var(--color-paper);
+  color: var(--color-action);
 }
 
-/* Footer */
-.site-footer {
-  background: var(--navy);
-  color: #c9d3e3;
-  text-align: center;
-  padding: 1.5rem 1rem;
-  font-size: 0.9rem;
+.button.paper-outline {
+  border-color: var(--color-paper);
+  color: var(--color-paper);
 }
 
-/* Users pages */
-.stack {
-  display: grid;
-  gap: 2rem;
+/* One hover style for every button: it fills with ink, with paper text (14.82:1). */
+.button:hover {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-paper);
 }
 
-.panel {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-top: 4px solid var(--gold);
-  border-radius: 10px;
-  padding: 1.5rem;
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
-.muted {
-  color: var(--muted);
-}
+/* ---------- Tables (DESIGN.md rule 6, ref-2) ---------- */
 
 .table-wrap {
+  position: relative; /* keeps visually hidden text inside the scrolling area */
   overflow-x: auto;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
 }
 
 .table {
@@ -227,155 +396,577 @@ a {
 
 .table th,
 .table td {
-  padding: 0.6rem 0.9rem;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-line);
   text-align: left;
-  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
 }
 
 .table th {
-  color: var(--navy);
-  background: #eef1f7;
+  color: var(--color-muted);
+  font-size: var(--font-size-small);
+  font-weight: 500;
 }
 
 .table tr:last-child td {
   border-bottom: none;
 }
 
+.table tr.highlight td {
+  background: var(--color-highlight);
+}
+
+.table tbody tr:hover td {
+  background: var(--color-tint);
+}
+
+.table-name {
+  font-weight: 500;
+}
+
 .table .actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-2);
   justify-content: flex-end;
 }
 
-.details {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0 0 1.25rem;
+/* ---------- Empty state (DESIGN.md rule 7, ref-3) ---------- */
+
+.empty {
+  margin: 0;
+  padding: var(--space-5);
+  border: 1px dashed var(--color-muted);
+  border-radius: var(--radius);
+  color: var(--color-muted);
+  text-align: center;
 }
 
-.details div {
-  display: grid;
-  grid-template-columns: 8rem 1fr;
+.empty p {
+  margin: 0 0 var(--space-3);
 }
 
-.details dt {
-  color: var(--muted);
-  font-weight: 600;
+/* ---------- Utilities ---------- */
+
+/* Hidden on screen, still read by screen readers. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
-.details dd {
+/* A readable column for text-heavy pages and detail pages. */
+.reading {
+  max-width: var(--reading-width);
+}
+
+/* The one standalone link style: "← All users", "Read more →", "All announcements →". */
+.text-link {
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
+/* The back link at the top of a page. */
+.page-back {
+  margin: 0 0 var(--space-4);
+}
+
+.page-header h1 {
   margin: 0;
 }
 
+.page-header .meta {
+  margin: var(--space-1) 0 0;
+}
+
+/* ---------- Forms ---------- */
+
 .form {
   display: grid;
-  gap: 1rem;
-  max-width: 420px;
+  gap: var(--space-3);
+  max-width: var(--form-width);
+}
+
+.form .button {
+  justify-self: start;
 }
 
 .field {
   display: grid;
-  gap: 0.3rem;
-  font-weight: 600;
-  color: var(--navy);
+  gap: var(--space-1);
+  font-weight: 500;
 }
 
-.field input {
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+.field input,
+.field textarea {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-muted);
+  border-radius: var(--radius);
+  background: var(--color-paper);
+  color: var(--color-ink);
   font: inherit;
   font-weight: 400;
 }
 
-.field.invalid input {
-  border-color: #b42318;
+.field textarea {
+  resize: vertical;
+}
+
+.field.invalid input,
+.field.invalid textarea {
+  border-color: var(--color-danger);
 }
 
 .form-error {
   margin: 0;
-  color: #b42318;
-}
-
-.button {
-  display: inline-block;
-  padding: 0.4rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--card);
-  color: var(--navy);
-  font: inherit;
-  font-size: 0.9rem;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.button.primary {
-  justify-self: start;
-  background: var(--navy);
-  border-color: var(--navy);
-  color: #fff;
-}
-
-.button.danger {
-  color: #b42318;
-  border-color: #f1c4bf;
-}
-
-.button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.page-header .section-title {
-  margin: 0;
-}
-
-.empty {
-  padding: 1.5rem;
-  background: var(--card);
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  color: var(--muted);
-  text-align: center;
-}
-
-.notice {
-  margin: 0 0 1rem;
-  padding: 0.6rem 0.9rem;
-  border-radius: 6px;
-  background: #fdf3dc;
-  color: #8a6210;
-  font-weight: 600;
-}
-
-.table tr.highlight td {
-  background: #fdf3dc;
+  color: var(--color-danger);
 }
 
 .field .form-error {
+  font-size: var(--font-size-small);
   font-weight: 400;
-  font-size: 0.9rem;
 }
 
-.user-nav {
+/* ---------- About page ---------- */
+
+.prose h2 {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: var(--font-size-h3);
+}
+
+.prose .lead {
+  color: var(--color-ink);
+}
+
+.prose li + li {
+  margin-top: var(--space-2);
+}
+
+/* ---------- Profile (users) ---------- */
+
+.profile {
+  margin-bottom: var(--space-4);
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.profile-head h1 {
+  margin: 0 0 var(--space-1);
+}
+
+/* Initials on the highlight colour (ink on it is 12.51:1). */
+.avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: var(--radius);
+  background: var(--color-highlight);
+  color: var(--color-ink);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-h2);
+  font-weight: 600;
+}
+
+/* Label / value pairs side by side, one under the other on narrow screens. */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--facts-column-min), 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--color-muted);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .avatar {
+    width: var(--avatar-size-small);
+    height: var(--avatar-size-small);
+    font-size: var(--font-size-h3);
+  }
+}
+
+/* ---------- Announcements ---------- */
+
+.card-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The announcement that was just posted. */
+/* Two lines of the message, then "…". */
+.preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.meta {
+  margin: 0 0 var(--space-4);
+  color: var(--color-muted);
+  font-size: var(--font-size-small);
+}
+
+/* The full message: keeps the line breaks typed into the form. */
+.message {
+  margin: 0 0 var(--space-5);
+  white-space: pre-wrap;
+}
+
+/* ---------- 404 and 500 pages ---------- */
+
+.status-page {
+  max-width: var(--reading-width);
+  padding: var(--space-5) 0;
+}
+
+/* The status code in the largest heading size (BRAND.md: 40), with a small accent bar under it. */
+.status-code {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-h1);
+}
+
+.status-code::after {
+  content: "";
+  display: block;
+  width: var(--space-5);
+  height: var(--space-1);
+  margin-top: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-accent);
+}
+
+.status-line {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-body);
+}
+
+/* ---------- Homepage ---------- */
+
+/* Hero: a full-width band in the action colour with paper text (6.81:1). */
+.hero {
+  margin-top: calc(-1 * var(--space-5));
+  padding: var(--space-5) 0;
+  background: var(--color-action);
+  color: var(--color-paper);
+}
+
+.hero h1 {
+  max-width: var(--hero-title-width);
+  margin: 0 0 var(--space-3);
+  color: var(--color-paper);
+}
+
+.hero .lead {
+  max-width: var(--hero-text-width);
+  margin: 0 0 var(--space-4);
+}
+
+.hero :focus-visible {
+  outline-color: var(--color-paper);
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
+/* A small accent marker (BRAND.md: accent is for small highlights only, never text). */
+.eyebrow::before {
+  content: "";
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-accent);
+}
+
+/* Stats strip: big numerals in the heading font, small labels. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column-reverse; /* the number above its label; the label is read first */
+  gap: var(--space-1);
+  padding: var(--space-4);
+}
+
+.stat + .stat {
+  border-left: 1px solid var(--color-line);
+}
+
+.stat dt {
+  color: var(--color-muted);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
+.stat dd {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--font-size-h1);
+  font-weight: 600;
+  line-height: 1;
+}
+
+@media (max-width: 767px) {
+  .stat {
+    padding: var(--space-3);
+  }
+
+  .stat dd {
+    font-size: var(--font-size-h2);
+  }
+}
+
+/* On narrow phones: one row per number ("20 Users"), so the labels never overflow. */
+@media (max-width: 479px) {
+  .stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stat {
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .stat + .stat {
+    border-left: none;
+    border-top: 1px solid var(--color-line);
+  }
+}
+
+/* Card grid (DESIGN.md rule 5, ref-1): 3-up, 2-up below 1024px, 1-up below 768px. */
+.grid .card {
+  height: 100%;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 1023px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The first line of a message, cut with "…" if it is longer. */
+.first-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coming-soon {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.25rem;
-  font-weight: 600;
-  color: var(--navy);
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-muted);
 }
 
-.button-row {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
+@media (max-width: 767px) {
+  h1 {
+    font-size: var(--font-size-h2);
+  }
 }
+
+/* ---------- Motion (BRAND.md, DESIGN.md rule 9) ---------- */
+
+/* Links in navigation and cards: no underline at rest; it slides in on hover and focus.
+   Links inside running text and tables keep their normal underline, so they never
+   depend on colour alone. */
+.site-nav a,
+.text-link,
+.card-title a {
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible,
+.text-link:hover,
+.text-link:focus-visible,
+.card-title a:hover,
+.card-title a:focus-visible {
+  background-size: 100% 1px;
+}
+
+/* Cards that hold a link: the border turns the action colour on hover (instant with reduced motion). */
+.card:has(a):hover {
+  border-color: var(--color-action);
+}
+
+/* The homepage numbers (components/CountUp.tsx): the final number is laid out
+   invisibly under the counting one, so the width never changes while it counts. */
+.count-up {
+  position: relative;
+  display: inline-grid;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-up > [aria-hidden] {
+  grid-area: 1 / 1;
+}
+
+.count-up-space {
+  visibility: hidden;
+}
+
+/* Everything that moves. People who ask for reduced motion get none of it:
+   no entrance, no lift, no press, no transitions (colours change instantly). */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes enter-rise {
+    from {
+      opacity: 0;
+      translate: 0 var(--space-2);
+    }
+  }
+
+  @keyframes enter-fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* Page entrance: the content of <main> fades in and rises 8px. "backwards" holds the
+     start state only during a delay, so hover transforms work once it has finished. */
+  .page > * {
+    animation: enter-rise var(--motion-slow) var(--ease) backwards;
+  }
+
+  /* List entrance: cards and rows one after another, --motion-stagger apart, at most 6 steps. */
+  .grid > *,
+  .card-list > * {
+    animation: enter-rise var(--motion-base) var(--ease) backwards;
+    animation-delay: calc(var(--motion-stagger) * var(--step, 0));
+  }
+
+  /* Table rows only fade: moving table rows is unreliable in some browsers. */
+  .table tbody tr {
+    animation: enter-fade var(--motion-base) var(--ease) backwards;
+    animation-delay: calc(var(--motion-stagger) * var(--step, 0));
+  }
+
+  :is(.grid, .card-list) > :nth-child(2),
+  .table tbody tr:nth-child(2) {
+    --step: 1;
+  }
+
+  :is(.grid, .card-list) > :nth-child(3),
+  .table tbody tr:nth-child(3) {
+    --step: 2;
+  }
+
+  :is(.grid, .card-list) > :nth-child(4),
+  .table tbody tr:nth-child(4) {
+    --step: 3;
+  }
+
+  :is(.grid, .card-list) > :nth-child(5),
+  .table tbody tr:nth-child(5) {
+    --step: 4;
+  }
+
+  :is(.grid, .card-list) > :nth-child(n + 6),
+  .table tbody tr:nth-child(n + 6) {
+    --step: 5;
+  }
+
+  /* Hover on cards: lift 2px. */
+  .card {
+    transition:
+      transform var(--motion-fast) var(--ease),
+      border-color var(--motion-fast) var(--ease);
+  }
+
+  .card:has(a):hover {
+    transform: translateY(-2px);
+  }
+
+  /* The underline slides in from the left. */
+  .site-nav a,
+  .text-link,
+  .card-title a {
+    transition:
+      background-size var(--motion-base) var(--ease),
+      color var(--motion-fast) var(--ease);
+  }
+
+  /* Buttons: the colour changes on hover, and the button shrinks a little while pressed. */
+  .button {
+    transition:
+      background-color var(--motion-fast) var(--ease),
+      border-color var(--motion-fast) var(--ease),
+      color var(--motion-fast) var(--ease),
+      transform var(--motion-fast) var(--ease);
+  }
+
+  .button:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  /* Other links and table rows: colours ease instead of jumping. */
+  a,
+  .table tbody td {
+    transition:
+      color var(--motion-fast) var(--ease),
+      background-color var(--motion-fast) var(--ease);
+  }
+}
+

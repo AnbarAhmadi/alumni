@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 import type { Announcement } from "@/models/Announcement";
 import type { UserFormState } from "./UserForm";
+import { friendlyError } from "./friendlyError";
 
 // Same { error, field, values } shape as the user form.
 export type AnnouncementFormState = UserFormState;
@@ -19,18 +20,15 @@ const FIELDS = [
   { name: "author", label: "Author (optional)", required: false, multiline: false },
 ] as const;
 
-// globals.css only styles `.field input`, so the content box copies that look here.
-const textareaStyle = (invalid: boolean) => ({
-  padding: "0.55rem 0.7rem",
-  border: `1px solid ${invalid ? "#b42318" : "var(--border)"}`,
-  borderRadius: 6,
-  font: "inherit",
-  fontWeight: 400,
-  resize: "vertical" as const,
-});
+// The names used in error messages ("Title is required."); the API keeps its own messages.
+const ERROR_LABELS = { title: "Title", content: "Content", author: "Author" };
 
+// Create and edit form. Each label is above its field, and an error is shown right
+// under the field it is about (styles in globals.css: .field, .form-error).
 export default function AnnouncementForm({ action, announcement, submitLabel }: Props) {
   const [state, formAction, pending] = useActionState(action, {});
+  const formId = useId();
+  const error = state.error && friendlyError(state.error, ERROR_LABELS);
 
   const valueOf = (name: (typeof FIELDS)[number]["name"]) =>
     state.values?.[name] ?? announcement?.[name] ?? "";
@@ -39,33 +37,33 @@ export default function AnnouncementForm({ action, announcement, submitLabel }: 
     <form action={formAction} className="form">
       {FIELDS.map((field) => {
         const invalid = state.field === field.name;
+        const inputId = `${formId}-${field.name}`;
+        const errorId = `${inputId}-error`;
         const common = {
+          id: inputId,
           name: field.name,
           defaultValue: valueOf(field.name),
           required: field.required && !announcement,
           "aria-invalid": invalid || undefined,
+          "aria-describedby": invalid ? errorId : undefined,
         };
         return (
-          <label key={field.name} className={invalid ? "field invalid" : "field"}>
-            <span>{field.label}</span>
-            {field.multiline ? (
-              <textarea {...common} rows={5} style={textareaStyle(invalid)} />
-            ) : (
-              <input {...common} type="text" />
-            )}
+          <div key={field.name} className={invalid ? "field invalid" : "field"}>
+            <label htmlFor={inputId}>{field.label}</label>
+            {field.multiline ? <textarea {...common} rows={8} /> : <input {...common} type="text" />}
             {invalid && (
-              <span className="form-error" role="alert">
-                {state.error}
-              </span>
+              <p id={errorId} className="form-error" role="alert">
+                {error}
+              </p>
             )}
-          </label>
+          </div>
         );
       })}
 
       {/* Errors that aren't about one field, e.g. "Send at least one of: ..." */}
-      {state.error && !state.field && (
+      {error && !state.field && (
         <p className="form-error" role="alert">
-          {state.error}
+          {error}
         </p>
       )}
 

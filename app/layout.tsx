@@ -1,47 +1,44 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Inter, Source_Serif_4 } from "next/font/google";
+import SiteFooter from "@/components/SiteFooter";
+import SiteHeader from "@/components/SiteHeader";
 import "./globals.css";
 
+// The two brand fonts (BRAND.md), self-hosted by next/font. Each one sets a CSS
+// variable on <html>; globals.css uses them in --font-heading and --font-body.
+// latin-ext is needed for Turkish letters such as ş, ğ and ı.
+const sourceSerif = Source_Serif_4({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-source-serif-4",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Alumni Tracking System",
-  description: "Istanbul University MIS alumni tracking platform",
+  title: "Homecoming",
+  description: "Where our graduates are now. The alumni platform of the Management Information Systems Department, Istanbul University.",
 };
 
-const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/about", label: "About" },
-  { href: "/announcements", label: "Announcements" },
-  { href: "/#alumni", label: "Alumni Directory" },
-  { href: "/#mentorship", label: "Mentorship" },
-  { href: "/#events", label: "Events" },
-  { href: "/#careers", label: "Careers" },
-  { href: "/#contact", label: "Contact" },
-];
-
+// The one layout of the website (DESIGN.md rule 1): header with the wordmark and
+// the navigation, one centred content column, footer. Pages fill the column; a
+// section with the class "full-bleed" may span the full width (the homepage hero).
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${sourceSerif.variable} ${inter.variable}`}>
       <body>
-        <header className="site-header">
-          <div className="inner">
-            <Link href="/" className="logo">
-              Alumni <span>Tracking</span> System
-            </Link>
-            <nav className="nav">
-              {navItems.map((item) => (
-                <Link key={item.label} href={item.href}>
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-        </header>
-        {children}
-        <footer className="site-footer">
-          © {new Date().getFullYear()} Management Information Systems, Istanbul University
-        </footer>
+        <a href="#content" className="skip-link">Skip to content</a>
+        <SiteHeader />
+        <main id="content" className="page">
+          {children}
+        </main>
+        <SiteFooter />
       </body>
     </html>
   );

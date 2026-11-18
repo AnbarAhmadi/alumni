@@ -4,13 +4,14 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import * as AnnouncementController from "@/controllers/AnnouncementController";
 import AnnouncementDetails from "@/components/AnnouncementDetails";
-import AnnouncementNav from "@/components/AnnouncementNav";
 import DeleteAnnouncementButton from "@/components/DeleteAnnouncementButton";
 import { deleteAnnouncementAction } from "../actions";
 
-export const metadata: Metadata = {
-  title: "Announcement | Alumni Tracking System",
-};
+// The tab title: "<title> | Homecoming", or the 404 title if there is no such record.
+export async function generateMetadata({ params }: PageProps<"/announcements/[id]">): Promise<Metadata> {
+  const { ok, data } = await AnnouncementController.show((await params).id);
+  return { title: ok && data ? `${data.title} | Homecoming` : "Page not found | Homecoming" };
+}
 
 // GET /announcements/[id]: one announcement (Read). Delete posts back to this page.
 export default async function AnnouncementPage({ params, searchParams }: PageProps<"/announcements/[id]">) {
@@ -21,25 +22,26 @@ export default async function AnnouncementPage({ params, searchParams }: PagePro
   if (!ok) notFound();
 
   return (
-    <main className="container stack">
-      <AnnouncementNav announcementId={announcement.id} />
-
-      <section className="panel">
-        {updated && (
-          <p className="notice" role="status">
-            Changes saved.
-          </p>
-        )}
-        <h2 className="section-title">{announcement.title}</h2>
-        <AnnouncementDetails announcement={announcement} />
-        <div className="button-row">
-          <Link href={`/announcements/${announcement.id}/edit`} className="button primary">Edit</Link>
-          <DeleteAnnouncementButton
-            action={deleteAnnouncementAction.bind(null, announcement.id)}
-            title={announcement.title}
-          />
-        </div>
-      </section>
-    </main>
+    <article className="reading" aria-labelledby="announcement-title">
+      <p className="page-back">
+        <Link href="/announcements" className="text-link">
+          <span aria-hidden="true">← </span>All announcements
+        </Link>
+      </p>
+      {updated && (
+        <p className="notice" role="status">
+          Changes saved.
+        </p>
+      )}
+      <h1 id="announcement-title">{announcement.title}</h1>
+      <AnnouncementDetails announcement={announcement} />
+      <div className="button-row">
+        <Link href={`/announcements/${announcement.id}/edit`} className="button primary">Edit</Link>
+        <DeleteAnnouncementButton
+          action={deleteAnnouncementAction.bind(null, announcement.id)}
+          title={announcement.title}
+        />
+      </div>
+    </article>
   );
 }

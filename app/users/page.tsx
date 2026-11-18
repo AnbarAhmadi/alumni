@@ -1,35 +1,41 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import * as UserController from "@/controllers/UserController";
+import * as UserDirectoryController from "@/controllers/UserDirectoryController";
 import UserTable from "@/components/UserTable";
 import UserForm from "@/components/UserForm";
 import { createUserAction, deleteUserAction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Users | Alumni Tracking System",
+  title: "Users | Homecoming",
 };
 
-// GET /users: list (Read). The form below posts back to /users (Create).
+// GET /users: the table of users with their alumni status (Read). The form below posts back to /users (Create).
 export default async function UsersPage({ searchParams }: PageProps<"/users">) {
-  // Users live in memory and change at runtime, so render on every request.
+  // Users change at runtime, so render on every request.
   await connection();
-  const { data: users } = await UserController.index();
+  const { data: users = [] } = await UserDirectoryController.index();
   const { created } = await searchParams;
+  const alumni = users.filter((user) => user.isAlumni).length;
 
   return (
-    <main className="container stack">
-      <section>
+    <div className="stack">
+      <section aria-labelledby="users-title">
         <div className="page-header">
-          <h2 className="section-title">Users ({users.length})</h2>
-          <a href="#new-user" className="button primary">+ New user</a>
+          <div>
+            <h1 id="users-title">Users</h1>
+            <p className="meta">
+              {users.length === 1 ? "1 user" : `${users.length} users`}, {alumni} of them alumni.
+            </p>
+          </div>
+          <a href="#new-user" className="button primary">Add a user</a>
         </div>
         <UserTable users={users} highlightId={Number(created)} deleteAction={deleteUserAction} />
       </section>
 
-      <section id="new-user" className="panel">
-        <h2 className="section-title">Add a user</h2>
-        <UserForm action={createUserAction} submitLabel="Create user" />
+      <section id="new-user" className="card" aria-labelledby="new-user-title">
+        <h2 id="new-user-title" className="section-title">Add a user</h2>
+        <UserForm action={createUserAction} submitLabel="Add user" />
       </section>
-    </main>
+    </div>
   );
 }

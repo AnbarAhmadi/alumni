@@ -112,7 +112,7 @@ const validationErrors = {
 
 const exampleAnnouncement = {
   id: 1,
-  title: "Welcome to the Alumni Tracking System",
+  title: "Welcome to Homecoming",
   content: "The MIS department now has one place to stay in touch with its graduates. Please keep your details up to date.",
   author: "MIS Department",
   createdAt: "2026-09-22T09:00:00.000Z",
@@ -152,10 +152,27 @@ function withServerErrors<T extends Record<string, Record<string, unknown>>>(pat
   return paths;
 }
 
+// Every HTML page shows the 500 page when something fails on the server (app/error.tsx):
+// "Something went wrong on our side." with Try again; never the error itself.
+const pageError = {
+  description: "Something failed on the server (for example the database is down): the 500 page is shown, with no error details.",
+  content: html,
+};
+
+function withPageErrors<T extends Record<string, Record<string, unknown>>>(paths: T): T {
+  for (const item of Object.values(paths)) {
+    for (const method of METHODS) {
+      const operation = item[method] as { tags?: string[]; responses?: Record<string, unknown> } | undefined;
+      if (operation?.responses && operation.tags?.some((tag) => tag.endsWith("(views)"))) operation.responses[500] = pageError;
+    }
+  }
+  return paths;
+}
+
 export const openApiSpec = {
   openapi: "3.0.3",
   info: {
-    title: "Alumni System API",
+    title: "Homecoming API",
     version: "1.0.0",
     description:
       "Users and announcements are stored in PostgreSQL (through Prisma), so they are kept when the server restarts. " +
@@ -176,7 +193,7 @@ export const openApiSpec = {
     {
       name: "Users (views)",
       description:
-        "HTML pages for users (page -> UserController -> UserModel -> view components). " +
+        "HTML pages for users. Reading: page -> UserDirectoryController -> UserModel -> view components; the edit page and the forms: UserController. " +
         "The POST operations are the pages' forms: Next.js server actions that post back to the page URL with an internal action id the page provides. " +
         "They are documented for completeness and can't be sent from Swagger's Try it out; use the Users JSON API for programmatic access.",
     },
@@ -186,12 +203,13 @@ export const openApiSpec = {
       description:
         "HTML pages for announcements (page -> AnnouncementController -> AnnouncementModel -> view components). " +
         "Like the user pages, the POST operations are server actions: documented here, but they can't be sent from Try it out. " +
-        "Use the Announcements JSON API for programmatic access.",
+        "Use the Announcements JSON API for programmatic access. " +
+        "Like every HTML page, these pages show the 404 page for an unknown id and the 500 page when something fails on the server.",
     },
     { name: "Health", description: "Check that the API is running." },
     { name: "Examples", description: "Simple plain-text example routes." },
   ],
-  paths: withServerErrors({
+  paths: withServerErrors(withPageErrors({
     "/api/users": {
       get: {
         tags: ["Users"],
@@ -382,8 +400,9 @@ export const openApiSpec = {
         tags: ["Users (views)"],
         summary: "List users (HTML)",
         description:
-          "UserController.index -> UserModel.getAll -> UserTable. Shows all users with View, Edit and Delete buttons, " +
-          "an \"Add a user\" form, and an empty-state message when there are no users.",
+          "UserDirectoryController.index -> UserModel.getAllWithStatus -> UserTable. Shows the title with a count line, " +
+          "a table of users (name as a link, email, school, alumni badge, graduation year, Edit and Delete), " +
+          "an \"Add a user\" form, and the empty state \"No users yet. Add the first one.\" when there are none.",
         parameters: [
           {
             name: "created",
@@ -413,7 +432,9 @@ export const openApiSpec = {
         responses: {
           303: { description: "Created: redirects to /users?created={id}, which highlights the new user." },
           200: {
-            description: "Validation error: the page is shown again with the message under the field and the typed values kept.",
+            description:
+              "Validation error: the page is shown again with the typed values kept and the message under the field, in plain words " +
+              "(for example \"Full name is required.\"; the JSON API keeps its own messages).",
             content: html,
           },
         },
@@ -425,7 +446,9 @@ export const openApiSpec = {
         tags: ["Users (views)"],
         summary: "User details (HTML)",
         description:
-          "UserController.show -> UserModel.getById -> UserDetails. Shows every field as label/value rows, with Edit and Delete buttons.",
+          "UserDirectoryController.profile -> UserModel.getProfile -> UserDetails and JobPostingTable. Shows the profile " +
+          "(initials avatar, name, alumni badge, email, school, graduation year) with Edit and Delete, and the user's job postings " +
+          "as a table (\"No postings yet.\" if there are none).",
         parameters: [
           {
             name: "updated",
@@ -437,7 +460,7 @@ export const openApiSpec = {
         ],
         responses: {
           200: { description: "The details page.", content: html },
-          404: { description: "No user has this id (or the id is not a number): the generic \"Page not found\" page is shown.", content: html },
+          404: { description: "No user has this id (or the id is not a number): the 404 page (\"There is no page at this address.\") is shown.", content: html },
         },
       },
       post: {
@@ -458,7 +481,7 @@ export const openApiSpec = {
         description: "UserController.show -> UserModel.getById -> UserForm, prefilled with the user's current values.",
         responses: {
           200: { description: "The edit page.", content: html },
-          404: { description: "No user has this id (or the id is not a number): the generic \"Page not found\" page is shown.", content: html },
+          404: { description: "No user has this id (or the id is not a number): the 404 page (\"There is no page at this address.\") is shown.", content: html },
         },
       },
       post: {
@@ -531,7 +554,7 @@ export const openApiSpec = {
         description:
           "title and content are required. author is optional, and is removed if it isn't sent. id and createdAt stay the same.",
         requestBody: writeBody("AnnouncementWrite", {
-          title: "Welcome to the new Alumni Tracking System",
+          title: "Welcome to the new Homecoming",
           content: "Please check that your details are still correct.",
         }),
         responses: {
@@ -539,7 +562,7 @@ export const openApiSpec = {
             description: "The updated announcement.",
             content: json(ref("Announcement"), {
               id: 1,
-              title: "Welcome to the new Alumni Tracking System",
+              title: "Welcome to the new Homecoming",
               content: "Please check that your details are still correct.",
               createdAt: exampleAnnouncement.createdAt,
             }),
@@ -581,14 +604,15 @@ export const openApiSpec = {
         tags: ["Announcements (views)"],
         summary: "List announcements (HTML)",
         description:
-          "AnnouncementController.index -> AnnouncementModel.getAll -> AnnouncementTable. Shows all announcements with View, " +
-          "Edit and Delete buttons, an \"Add an announcement\" form, and an empty-state message when there are none.",
+          "AnnouncementController.index -> AnnouncementModel.getAll -> AnnouncementList. Shows the announcements as cards, newest first " +
+          "(date, title, a 2-line preview, Read more, Edit and Delete), a \"Post an announcement\" form, and the empty state " +
+          "\"No announcements yet. Post the first one.\" when there are none.",
         parameters: [
           {
             name: "created",
             in: "query",
             required: false,
-            description: "Id of a just-created announcement; that row is highlighted with an \"Added\" notice.",
+            description: "Id of a just-created announcement; that card is highlighted with an \"Added\" notice.",
             schema: { type: "integer", example: 4 },
           },
         ],
@@ -598,8 +622,8 @@ export const openApiSpec = {
         tags: ["Announcements (views)"],
         summary: "Create an announcement (form on /announcements)",
         description:
-          "The \"Add an announcement\" form: createAnnouncementAction -> AnnouncementController.create -> AnnouncementModel.create. " +
-          "The Delete button on each row also posts here (deleteAnnouncementAction -> AnnouncementController.remove), " +
+          "The \"Post an announcement\" form: createAnnouncementAction -> AnnouncementController.create -> AnnouncementModel.create. " +
+          "The Delete button on each card also posts here (deleteAnnouncementAction -> AnnouncementController.remove), " +
           "after a confirmation in the browser.",
         requestBody: {
           required: true,
@@ -613,7 +637,9 @@ export const openApiSpec = {
         responses: {
           303: { description: "Created: redirects to /announcements?created={id}, which highlights the new announcement." },
           200: {
-            description: "Validation error: the page is shown again with the message under the field and the typed values kept.",
+            description:
+              "Validation error: the page is shown again with the typed values kept and the message under the field, in plain words " +
+              "(for example \"Full name is required.\"; the JSON API keeps its own messages).",
             content: html,
           },
         },
@@ -626,7 +652,7 @@ export const openApiSpec = {
         summary: "Announcement details (HTML)",
         description:
           "AnnouncementController.show -> AnnouncementModel.getById -> AnnouncementDetails. " +
-          "Shows every field as label/value rows, with Edit and Delete buttons.",
+          "Shows the title, the date and the full message, with Edit and Delete buttons.",
         parameters: [
           {
             name: "updated",
@@ -638,7 +664,7 @@ export const openApiSpec = {
         ],
         responses: {
           200: { description: "The details page.", content: html },
-          404: { description: "No announcement has this id (or the id is not a number): the generic \"Page not found\" page is shown.", content: html },
+          404: { description: "No announcement has this id (or the id is not a number): the 404 page (\"There is no page at this address.\") is shown.", content: html },
         },
       },
       post: {
@@ -661,7 +687,7 @@ export const openApiSpec = {
           "AnnouncementController.show -> AnnouncementModel.getById -> AnnouncementForm, prefilled with the current values.",
         responses: {
           200: { description: "The edit page.", content: html },
-          404: { description: "No announcement has this id (or the id is not a number): the generic \"Page not found\" page is shown.", content: html },
+          404: { description: "No announcement has this id (or the id is not a number): the 404 page (\"There is no page at this address.\") is shown.", content: html },
         },
       },
       post: {
@@ -734,7 +760,7 @@ export const openApiSpec = {
         },
       },
     },
-  }),
+  })),
   components: {
     responses: {
       InternalServerError: {

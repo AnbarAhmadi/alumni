@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 import type { User } from "@/models/User";
+import { friendlyError } from "./friendlyError";
 
 // What a create/edit server action returns when it doesn't redirect.
 export type UserFormState = {
@@ -23,8 +24,15 @@ const FIELDS = [
   { name: "school", label: "School (optional)", type: "text", required: false },
 ] as const;
 
+// The names used in error messages ("Full name is required."); the API keeps "fullName".
+const ERROR_LABELS = { fullName: "Full name", email: "Email", age: "Age", school: "School" };
+
+// Create and edit form. Each label is above its field, and an error is shown right
+// under the field it is about (styles in globals.css: .field, .form-error).
 export default function UserForm({ action, user, submitLabel }: Props) {
   const [state, formAction, pending] = useActionState(action, {});
+  const formId = useId();
+  const error = state.error && friendlyError(state.error, ERROR_LABELS);
 
   const valueOf = (name: (typeof FIELDS)[number]["name"]) =>
     state.values?.[name] ?? (user?.[name] !== undefined ? String(user[name]) : "");
@@ -33,30 +41,34 @@ export default function UserForm({ action, user, submitLabel }: Props) {
     <form action={formAction} className="form">
       {FIELDS.map((field) => {
         const invalid = state.field === field.name;
+        const inputId = `${formId}-${field.name}`;
+        const errorId = `${inputId}-error`;
         return (
-          <label key={field.name} className={invalid ? "field invalid" : "field"}>
-            <span>{field.label}</span>
+          <div key={field.name} className={invalid ? "field invalid" : "field"}>
+            <label htmlFor={inputId}>{field.label}</label>
             <input
+              id={inputId}
               name={field.name}
               type={field.type}
               defaultValue={valueOf(field.name)}
               required={field.required && !user}
               min={field.type === "number" ? 1 : undefined}
               aria-invalid={invalid || undefined}
+              aria-describedby={invalid ? errorId : undefined}
             />
             {invalid && (
-              <span className="form-error" role="alert">
-                {state.error}
-              </span>
+              <p id={errorId} className="form-error" role="alert">
+                {error}
+              </p>
             )}
-          </label>
+          </div>
         );
       })}
 
       {/* Errors that aren't about one field, e.g. "Send at least one of: ..." */}
-      {state.error && !state.field && (
+      {error && !state.field && (
         <p className="form-error" role="alert">
-          {state.error}
+          {error}
         </p>
       )}
 

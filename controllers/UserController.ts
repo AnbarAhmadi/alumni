@@ -1,7 +1,8 @@
-// Web controller: used by the /users pages and their server actions.
-// Returns plain data or a result object; no JSON or HTTP response code.
-// All data access goes through UserModel.
-import { ConflictError, UserModel, ValidationError, type User, type UserWithJobs } from "@/models/User";
+// Web controller: used by the /users/[id]/edit page and the /users server actions
+// (create, update, delete). Reading the list and the profile goes through
+// UserDirectoryController. Returns plain data or a result object; no JSON or HTTP
+// response code. All data access goes through UserModel.
+import { ConflictError, UserModel, ValidationError, type User } from "@/models/User";
 import { formDataToObject } from "@/lib/parseBody";
 
 export type Result<T> = {
@@ -27,19 +28,8 @@ async function attempt<T>(action: () => Promise<T | null>, notFoundMessage = "No
   }
 }
 
-export async function index(): Promise<Result<User[]>> {
-  return { ok: true, data: await UserModel.getAll() };
-}
-
 export async function show(id: string | number): Promise<Result<User>> {
   const user = await UserModel.getById(toId(id));
-  if (!user) return { ok: false, error: `User "${id}" not found.` };
-  return { ok: true, data: user };
-}
-
-// The user with their job postings (same model function as GET /api/users/:id), for the /users/[id] page.
-export async function showWithJobs(id: string | number): Promise<Result<UserWithJobs>> {
-  const user = await UserModel.getByIdWithJobs(toId(id));
   if (!user) return { ok: false, error: `User "${id}" not found.` };
   return { ok: true, data: user };
 }

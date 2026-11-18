@@ -1,39 +1,44 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import * as AnnouncementController from "@/controllers/AnnouncementController";
-import AnnouncementTable from "@/components/AnnouncementTable";
+import AnnouncementList from "@/components/AnnouncementList";
 import AnnouncementForm from "@/components/AnnouncementForm";
 import { createAnnouncementAction, deleteAnnouncementAction } from "./actions";
 
 export const metadata: Metadata = {
-  title: "Announcements | Alumni Tracking System",
+  title: "Announcements | Homecoming",
 };
 
-// GET /announcements: list (Read). The form below posts back to /announcements (Create).
+// GET /announcements: the list, newest first (Read). The form below posts back to /announcements (Create).
 export default async function AnnouncementsPage({ searchParams }: PageProps<"/announcements">) {
-  // Announcements live in memory and change at runtime, so render on every request.
+  // Announcements change at runtime, so render on every request.
   await connection();
   const { data: announcements } = await AnnouncementController.index();
   const { created } = await searchParams;
 
   return (
-    <main className="container stack">
-      <section>
+    <div className="stack reading">
+      <section aria-labelledby="announcements-title">
         <div className="page-header">
-          <h2 className="section-title">Announcements ({announcements.length})</h2>
-          <a href="#new-announcement" className="button primary">+ New announcement</a>
+          <div>
+            <h1 id="announcements-title">Announcements</h1>
+            <p className="meta">
+              {announcements.length === 1 ? "1 announcement." : `${announcements.length} announcements.`}
+            </p>
+          </div>
+          <a href="#new-announcement" className="button primary">Post an announcement</a>
         </div>
-        <AnnouncementTable
+        <AnnouncementList
           announcements={announcements}
           highlightId={Number(created)}
           deleteAction={deleteAnnouncementAction}
         />
       </section>
 
-      <section id="new-announcement" className="panel">
-        <h2 className="section-title">Add an announcement</h2>
-        <AnnouncementForm action={createAnnouncementAction} submitLabel="Create announcement" />
+      <section id="new-announcement" className="card" aria-labelledby="new-announcement-title">
+        <h2 id="new-announcement-title" className="section-title">Post an announcement</h2>
+        <AnnouncementForm action={createAnnouncementAction} submitLabel="Post announcement" />
       </section>
-    </main>
+    </div>
   );
 }

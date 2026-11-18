@@ -89,6 +89,21 @@ export const AnnouncementModel = {
     return rows.map(toAnnouncement);
   },
 
+  // The newest announcements first, at most `limit` of them (read-only; used by the homepage).
+  async getLatest(limit: number): Promise<Announcement[]> {
+    const rows = await prisma.announcement.findMany({
+      select: SELECT,
+      orderBy: [{ postedAt: "desc" }, { id: "desc" }],
+      take: limit,
+    });
+    return rows.map(toAnnouncement);
+  },
+
+  // How many announcements there are (read-only; used by the homepage).
+  async count(): Promise<number> {
+    return prisma.announcement.count();
+  },
+
   async getById(id: number): Promise<Announcement | null> {
     if (!isValidId(id)) return null;
     const row = await prisma.announcement.findUnique({ where: { id }, select: SELECT });

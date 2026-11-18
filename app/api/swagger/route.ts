@@ -8,7 +8,7 @@ const html = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Alumni System API</title>
+    <title>API documentation | Homecoming</title>
     <link rel="stylesheet" href="${SWAGGER_UI}/swagger-ui.css" />
   </head>
   <body>
