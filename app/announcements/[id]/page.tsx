@@ -5,6 +5,8 @@ import { connection } from "next/server";
 import * as AnnouncementController from "@/controllers/AnnouncementController";
 import AnnouncementDetails from "@/components/AnnouncementDetails";
 import DeleteAnnouncementButton from "@/components/DeleteAnnouncementButton";
+import { can } from "@/lib/access";
+import { guardPage, viewerOf } from "@/lib/guard";
 import { deleteAnnouncementAction } from "../actions";
 
 // The tab title: "<title> | Homecoming", or the 404 title if there is no such record.
@@ -18,6 +20,8 @@ export default async function AnnouncementPage({ params, searchParams }: PagePro
   await connection();
   const { id } = await params;
   const { updated } = await searchParams;
+  // Access (lib/access.ts): public; Edit and Delete only for an admin.
+  const viewer = viewerOf(await guardPage("page /announcements/[id]", `/announcements/${id}`));
   const { ok, data: announcement } = await AnnouncementController.show(id);
   if (!ok) notFound();
 
@@ -35,13 +39,15 @@ export default async function AnnouncementPage({ params, searchParams }: PagePro
       )}
       <h1 id="announcement-title">{announcement.title}</h1>
       <AnnouncementDetails announcement={announcement} />
-      <div className="button-row">
-        <Link href={`/announcements/${announcement.id}/edit`} className="button primary">Edit</Link>
-        <DeleteAnnouncementButton
-          action={deleteAnnouncementAction.bind(null, announcement.id)}
-          title={announcement.title}
-        />
-      </div>
+      {can("form updateAnnouncement", viewer) && (
+        <div className="button-row">
+          <Link href={`/announcements/${announcement.id}/edit`} className="button primary">Edit</Link>
+          <DeleteAnnouncementButton
+            action={deleteAnnouncementAction.bind(null, announcement.id)}
+            title={announcement.title}
+          />
+        </div>
+      )}
     </article>
   );
 }

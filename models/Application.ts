@@ -52,6 +52,16 @@ function errorCode(err: unknown) {
 
 // ---------- Validation ----------
 
+// Where an application stands (Week 10, ddd.md). New applications are always "applied".
+export const APPLICATION_STATUSES = ["applied", "reviewed", "hired", "rejected"] as const;
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
+
+// An application with the applicant and the posting, for the admin panel (Week 10).
+export type ApplicationWithDetails = Application & {
+  user: { id: number; fullName: string };
+  jobPosting: { id: number; title: string; company: string };
+};
+
 const FIELDS = ["userId", "jobPostingId", "status"] as const;
 
 // Checks the fields in `input`. `required` lists fields that must be present;
@@ -77,12 +87,12 @@ function validate(input: ApplicationInput, required: readonly (keyof Application
     data[field] = value;
   }
 
-  // Only "applied" (the default) is defined in ddd.md so far; other values are not decided yet.
+  // The four statuses of ddd.md (Week 10). Anything else is refused.
   if (input.status !== undefined) {
-    if (typeof input.status !== "string" || input.status.trim() === "") {
-      throw new ValidationError('"status" must be a non-empty string.', "status");
-    }
-    data.status = input.status.trim();
+    const status = typeof input.status === "string" ? input.status.trim().toLowerCase() : "";
+    const known = APPLICATION_STATUSES.find((s) => s === status);
+    if (!known) throw new ValidationError(`"status" must be one of: ${APPLICATION_STATUSES.join(", ")}.`, "status");
+    data.status = known;
   }
 
   return data;
@@ -129,6 +139,24 @@ export const ApplicationModel = {
       orderBy: { id: "asc" },
     });
     return rows.map(({ jobPosting, ...row }) => ({ ...toApplication(row), jobPosting }));
+  },
+
+  // Every application with the applicant's name and the posting, newest first (admin panel, Week 10).
+  async getAllWithDetails(): Promise<ApplicationWithDetails[]> {
+    const rows = await prisma.application.findMany({
+      select: {
+        ...SELECT,
+        user: { select: { id: true, fullName: true } },
+        jobPosting: { select: { id: true, title: true, company: true } },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+    return rows.map(({ user, jobPosting, ...row }) => ({ ...toApplication(row), user, jobPosting }));
+  },
+
+  // How many applications there are (read-only; the admin dashboard, Week 10).
+  async count(): Promise<number> {
+    return prisma.application.count();
   },
 
   async getById(id: number): Promise<Application | null> {

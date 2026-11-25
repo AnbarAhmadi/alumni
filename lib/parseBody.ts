@@ -14,8 +14,9 @@ export class BodyParseError extends Error {
 
 const FORM_TYPES = ["multipart/form-data", "application/x-www-form-urlencoded"];
 const NUMBER_PATTERN = /^-?\d+(\.\d+)?$/;
-// Form values are text; these fields are turned into numbers (ids for the job and application endpoints).
-const NUMERIC_FIELDS = ["age", "userId", "jobPostingId"];
+// Form values are text; these fields are turned into numbers (ids for the job and application
+// endpoints, graduationYear for register).
+const NUMERIC_FIELDS = ["age", "userId", "jobPostingId", "graduationYear"];
 
 // Turns form values (always strings) into a plain object: skips empty values
 // and files, and converts numeric fields such as age to numbers.

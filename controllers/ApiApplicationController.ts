@@ -28,25 +28,34 @@ function handleError(err: unknown) {
   throw err;
 }
 
-// POST /api/jobs/[id]/applications → 201 | 400 | 404 | 409 | 415
-// Body: { "userId": ... }, the applicant. The posting comes from the URL; a
-// jobPostingId in the body is ignored. A second application by the same user
-// is refused by the database's unique pair (userId, jobPostingId) → 409.
-export async function createForJob(request: Request, id: string) {
+// POST /api/jobs/[id]/applications → 201 | 404 | 409
+// Nothing comes from the body (Week 10, ddd.md Access rules), so it isn't read at all:
+// the applicant is ALWAYS the logged-in user, the posting comes from the URL, and the
+// status is always "applied" (the database default). Only the posting's owner or an admin
+// changes a status, with PATCH /api/applications/[id]. A second application by the same
+// user is refused by the database's unique pair (userId, jobPostingId) → 409.
+export async function createForJob(id: string, userId: number) {
   if (!(await JobPostingModel.getById(toId(id)))) return recordNotFound("Job posting", id);
 
   try {
-    const body = await parseBody(request);
-    const userId = body.userId;
-    if (userId === undefined) throw new ValidationError('"userId" is required.', "userId");
-    if (typeof userId !== "number" || !Number.isInteger(userId) || userId <= 0) {
-      throw new ValidationError('"userId" must be a positive whole number.', "userId");
-    }
-    if (!(await UserModel.getById(userId))) return recordNotFound("User", userId);
-
-    // Only userId (and an optional status) come from the body; jobPostingId is set last, from the URL.
-    const application = await ApplicationModel.create({ userId, status: body.status, jobPostingId: toId(id) });
+    const application = await ApplicationModel.create({ userId, jobPostingId: toId(id) });
     return NextResponse.json(application, { status: 201 });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+// PATCH /api/applications/[id] → 200 | 400 | 404 | 415 (Week 10)
+// Changes an application's status, and nothing else: userId and jobPostingId in the
+// body are ignored. Access (posting owner or admin) is checked by the route's guard.
+export async function updateStatus(request: Request, id: string) {
+  if (!(await ApplicationModel.getById(toId(id)))) return recordNotFound("Application", id);
+
+  try {
+    const { status } = await parseBody(request);
+    if (status === undefined) throw new ValidationError('"status" is required.', "status");
+    const application = await ApplicationModel.update(toId(id), { status });
+    return application ? NextResponse.json(application) : recordNotFound("Application", id);
   } catch (err) {
     return handleError(err);
   }
@@ -64,4 +73,10 @@ export async function getForUser(_request: Request, id: string) {
   if (!(await UserModel.getById(toId(id)))) return recordNotFound("User", id);
 
   return NextResponse.json(await ApplicationModel.getAllByUser(toId(id)));
+}
+
+// DELETE /api/applications/[id] → 204 | 404 (Week 10, the admin panel; admin only).
+export async function remove(id: string) {
+  if (!(await ApplicationModel.remove(toId(id)))) return recordNotFound("Application", id);
+  return new NextResponse(null, { status: 204 });
 }

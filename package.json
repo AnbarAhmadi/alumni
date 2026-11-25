@@ -8,11 +8,13 @@
     "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "make-admin": "node scripts/make-admin.mts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "bcryptjs": "^3.0.3",
     "next": "^16.3.6",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

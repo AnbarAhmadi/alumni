@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import * as UserController from "@/controllers/UserController";
 import UserForm from "@/components/UserForm";
+import { guardPage, idFrom } from "@/lib/guard";
 import { updateUserAction } from "../../actions";
 
 // The tab title: "Edit user | Homecoming", or the 404 title if there is no such record.
@@ -16,6 +17,9 @@ export async function generateMetadata({ params }: PageProps<"/users/[id]/edit">
 export default async function EditUserPage({ params }: PageProps<"/users/[id]/edit">) {
   await connection();
   const { id } = await params;
+  // Access (lib/access.ts): this user or an admin. Checked before the lookup, so a
+  // non-admin can't tell which ids exist.
+  await guardPage("page /users/[id]/edit", `/users/${id}/edit`, idFrom(id));
   const { ok, data: user } = await UserController.show(id);
   if (!ok) notFound();
 

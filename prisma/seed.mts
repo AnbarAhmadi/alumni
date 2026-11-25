@@ -1,5 +1,6 @@
-// Development seed: empties all tables, then inserts from the factories:
-//   20 fake users, 5 fake announcements,
+// Development seed: empties all tables (sessions too, so everyone is logged out), then inserts from the factories:
+//   20 fake users (ALUMNI or STUDENT by isAlumni, never ADMIN; all with the
+//   DEMO-ONLY password "homecoming-demo", see userFactory.mts), 5 fake announcements,
 //   2 or 3 job postings for each of the first 10 users (the other 10 get none),
 //   30 applications between random users and postings (never the same pair twice).
 // Running it again gives the same result (same rows, ids starting at 1 again), never duplicates.
@@ -43,10 +44,10 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
 try {
   // One transaction: either the tables are emptied AND filled, or nothing changes.
   const counts = await prisma.$transaction(async (tx) => {
-    // Applications first, then job postings, then the other tables, and the id counters
+    // Sessions and applications first, then job postings, then the other tables, and the id counters
     // are reset. PostgreSQL only lets a referenced table (users, job_postings) be emptied
     // in the same TRUNCATE as the tables that point to it, so it is one statement.
-    await tx.$executeRaw`TRUNCATE TABLE "applications", "job_postings", "users", "announcements" RESTART IDENTITY`;
+    await tx.$executeRaw`TRUNCATE TABLE "sessions", "applications", "job_postings", "users", "announcements" RESTART IDENTITY`;
 
     const users = await tx.user.createManyAndReturn({ data: buildUsers(USER_COUNT), select: { id: true } });
     const announcements = await tx.announcement.createMany({ data: buildAnnouncements(ANNOUNCEMENT_COUNT) });

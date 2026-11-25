@@ -21,6 +21,9 @@ export type JobPosting = {
 
 export type JobPostingFields = Omit<JobPosting, "id" | "createdAt">;
 
+// A posting with its owner's name, for the admin panel (Week 10).
+export type JobPostingWithOwner = JobPosting & { owner: { id: number; fullName: string } };
+
 // Raw input from a request body or form. Unknown keys (including "id" and "createdAt") are ignored.
 export type JobPostingInput = Record<string, unknown>;
 
@@ -140,6 +143,15 @@ export const JobPostingModel = {
     if (!isValidId(userId)) return [];
     const rows = await prisma.jobPosting.findMany({ where: { userId }, select: SELECT, orderBy: { id: "asc" } });
     return rows.map(toJobPosting);
+  },
+
+  // Every posting with its owner's name, newest first (admin panel, Week 10).
+  async getAllWithOwner(): Promise<JobPostingWithOwner[]> {
+    const rows = await prisma.jobPosting.findMany({
+      select: { ...SELECT, user: { select: { id: true, fullName: true } } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    });
+    return rows.map(({ user, ...row }) => ({ ...toJobPosting(row), owner: user }));
   },
 
   async getById(id: number): Promise<JobPosting | null> {

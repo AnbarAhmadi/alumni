@@ -1,3 +1,5 @@
+import { ACCESS_RULES, NOT_LOGGED_IN, type AccessKey, type Rule } from "@/lib/access";
+
 // OpenAPI description of every route in the app (API routes, the /users pages and the /announcements pages).
 // Keep this in sync when routes change.
 
@@ -169,6 +171,49 @@ function withPageErrors<T extends Record<string, Record<string, unknown>>>(paths
   return paths;
 }
 
+// Week 10: the access rule of every /api operation comes from lib/access.ts (the one rules map),
+// so the spec can't drift from what the guard does. Each guarded operation gets the session
+// cookie as its security, a line saying who may use it, and the 401 (and 403) answers.
+const ACCESS_TEXT: Record<Rule, string> = {
+  public: "Access: public.",
+  loggedIn: "Access: logged in.",
+  ownerOrAdmin: "Access: the owner of the record, or an admin.",
+  admin: "Access: admin only.",
+};
+
+const notLoggedIn = errorResponse("No valid session (not logged in, or the session has expired).", {
+  notLoggedIn: [NOT_LOGGED_IN],
+});
+
+const forbiddenResponse = (reason: string) => ({
+  description: "Logged in, but this account may not do this.",
+  content: json(ref("Forbidden"), { error: "Forbidden", reason }),
+});
+
+function withAccess<T extends Record<string, Record<string, unknown>>>(paths: T): T {
+  for (const [path, item] of Object.entries(paths)) {
+    if (!path.startsWith("/api/")) continue;
+    for (const method of METHODS) {
+      const operation = item[method] as
+        | { description?: string; security?: unknown; responses?: Record<string, unknown> }
+        | undefined;
+      if (!operation?.responses) continue;
+      const key = `${method.toUpperCase()} ${path.replace(/\{(\w+)\}/g, "[$1]")}` as AccessKey;
+      const rule: Rule | undefined = ACCESS_RULES[key];
+      if (!rule) continue;
+      operation.description = [ACCESS_TEXT[rule], operation.description].filter(Boolean).join(" ");
+      if (rule === "public") continue;
+      operation.security = [{ sessionCookie: [] }];
+      operation.responses[401] = notLoggedIn;
+      if (rule === "admin") operation.responses[403] = forbiddenResponse("Only an admin can do this.");
+      if (rule === "ownerOrAdmin") {
+        operation.responses[403] = forbiddenResponse("Only the owner of this record or an admin can do this.");
+      }
+    }
+  }
+  return paths;
+}
+
 export const openApiSpec = {
   openapi: "3.0.3",
   info: {
@@ -188,6 +233,19 @@ export const openApiSpec = {
   },
   tags: [
     { name: "Users", description: "JSON API for users: create, read, update and delete." },
+    {
+      name: "Register",
+      description:
+        "Create an account with a password and a role (ALUMNI or STUDENT; ADMIN can't be chosen). " +
+        "Only a bcrypt hash of the password is stored, and it is never returned by any endpoint.",
+    },
+    {
+      name: "Login",
+      description:
+        "Log in, log out and the current user. A session lasts 7 days and lives in the httpOnly cookie homecoming_session; " +
+        "the database keeps only the SHA-256 hash of its token. In Swagger, Try it out uses the browser's own cookie, " +
+        "so log in first and /api/me then works. Seeded users log in with their email and the demo-only password homecoming-demo.",
+    },
     { name: "Job postings", description: "A user's job postings (nested under /api/users/{id}). The user always comes from the URL." },
     { name: "Applications", description: "Users apply to job postings (many-to-many through applications). A user can apply to a posting only once." },
     {
@@ -206,10 +264,14 @@ export const openApiSpec = {
         "Use the Announcements JSON API for programmatic access. " +
         "Like every HTML page, these pages show the 404 page for an unknown id and the 500 page when something fails on the server.",
     },
+    {
+      name: "Admin (views)",
+      description: "The admin panel (Week 10): HTML pages for admins only. Documented here; use the Users JSON API for programmatic access.",
+    },
     { name: "Health", description: "Check that the API is running." },
     { name: "Examples", description: "Simple plain-text example routes." },
   ],
-  paths: withServerErrors(withPageErrors({
+  paths: withServerErrors(withAccess(withPageErrors({
     "/api/users": {
       get: {
         tags: ["Users"],
@@ -234,6 +296,112 @@ export const openApiSpec = {
         responses: {
           201: { description: "The created user.", content: json(ref("User"), exampleUser) },
           400: errorResponse("The body can't be read, or a field is missing or invalid.", validationErrors),
+          409: emailConflict,
+          415: unsupportedType,
+        },
+      },
+    },
+    "/api/login": {
+      post: {
+        tags: ["Login"],
+        summary: "Log in",
+        description:
+          "email and password are required. An unknown email and a wrong password give the same 401 with the same message, " +
+          "so the answer never tells whether an account exists. On success the response sets the session cookie (7 days).",
+        requestBody: writeBody("LoginRequest", { email: "ayse.yilmaz@example.com", password: "homecoming-demo" }),
+        responses: {
+          200: {
+            description: "Logged in: the user (never the password or its hash), and a Set-Cookie header with homecoming_session (HttpOnly, SameSite=Lax, Path=/, Max-Age 7 days; Secure in production).",
+            headers: {
+              "Set-Cookie": { schema: { type: "string", example: "homecoming_session=<token>; Path=/; Max-Age=604800; HttpOnly; SameSite=lax" } },
+            },
+            content: json(ref("UserAccount"), {
+              id: 1, fullName: "Ayşe Yılmaz", email: "ayse.yilmaz@example.com", age: 24,
+              school: "Istanbul University", isAlumni: true, graduationYear: 2023, role: "ADMIN",
+            }),
+          },
+          400: errorResponse("The body can't be read, or email or password is missing.", {
+            missingEmail: ['"email" is required.', "email"],
+            missingPassword: ['"password" is required.', "password"],
+          }),
+          401: errorResponse("Unknown email or wrong password: always the same message.", {
+            wrong: ["Email or password is wrong."],
+          }),
+          415: unsupportedType,
+        },
+      },
+    },
+    "/api/logout": {
+      post: {
+        tags: ["Login"],
+        summary: "Log out",
+        description: "Deletes the session of the cookie and clears the cookie. Also 204 when not logged in.",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          204: {
+            description: "Logged out. No body; the cookie is cleared (Max-Age=0).",
+            headers: { "Set-Cookie": { schema: { type: "string", example: "homecoming_session=; Path=/; Max-Age=0; HttpOnly; SameSite=lax" } } },
+          },
+        },
+      },
+    },
+    "/api/me": {
+      get: {
+        tags: ["Login"],
+        summary: "The logged-in user",
+        description: "The user of the session cookie. Without a cookie, or with an unknown or expired session, 401 (an expired session is deleted).",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          200: {
+            description: "The logged-in user (never the password or its hash).",
+            content: json(ref("UserAccount"), {
+              id: 1, fullName: "Ayşe Yılmaz", email: "ayse.yilmaz@example.com", age: 24,
+              school: "Istanbul University", isAlumni: true, graduationYear: 2023, role: "ADMIN",
+            }),
+          },
+          401: errorResponse("No valid session.", { notLoggedIn: ["Not logged in."] }),
+        },
+      },
+    },
+    "/api/register": {
+      post: {
+        tags: ["Register"],
+        summary: "Register a new account",
+        description:
+          "fullName, email, password (at least 8 characters), confirmPassword (the same as password) and role (ALUMNI or STUDENT) are required. " +
+          "graduationYear is required for ALUMNI (a whole number from 1950 to the current year) and not allowed for STUDENT; school is optional. " +
+          "ALUMNI accounts get isAlumni: true. Emails are stored in lowercase and must be unique: a duplicate gives 409. " +
+          "If several fields are invalid, the 400 names the first one. The response never contains the password or its hash.",
+        requestBody: writeBody("RegisterRequest", {
+          fullName: "Ayşe Yılmaz",
+          email: "ayse.yilmaz@example.com",
+          password: "a-long-password",
+          confirmPassword: "a-long-password",
+          role: "ALUMNI",
+          graduationYear: 2023,
+          school: "Istanbul University",
+        }),
+        responses: {
+          201: {
+            description: "The new account, without any password or hash.",
+            content: json(ref("UserAccount"), {
+              id: 21,
+              fullName: "Ayşe Yılmaz",
+              email: "ayse.yilmaz@example.com",
+              school: "Istanbul University",
+              isAlumni: true,
+              graduationYear: 2023,
+              role: "ALUMNI",
+            }),
+          },
+          400: errorResponse("The body can't be read, or a field is missing or invalid (the first invalid field).", {
+            missingField: ['"fullName" is required.', "fullName"],
+            shortPassword: ['"password" must be at least 8 characters.', "password"],
+            passwordMismatch: ['"confirmPassword" must match "password".', "confirmPassword"],
+            invalidRole: ['"role" must be ALUMNI or STUDENT.', "role"],
+            missingYear: ['"graduationYear" is required for alumni.', "graduationYear"],
+            yearForStudent: ['"graduationYear" is not allowed for students.', "graduationYear"],
+          }),
           409: emailConflict,
           415: unsupportedType,
         },
@@ -296,9 +464,41 @@ export const openApiSpec = {
       delete: {
         tags: ["Users"],
         summary: "Delete a user",
+        description:
+          "Safety rules (Week 10): an admin can't delete their own account, and the last admin can't be deleted (409).",
         responses: {
           204: { description: "The user was deleted. The response has no body." },
           404: notFound,
+          409: errorResponse("A safety rule refuses the delete.", {
+            selfDelete: ["You can't delete your own admin account."],
+            lastAdmin: ["The last admin can't be deleted."],
+          }),
+        },
+      },
+    },
+    "/api/users/{id}/role": {
+      parameters: [userIdParam],
+      patch: {
+        tags: ["Users"],
+        summary: "Change a user's role",
+        description:
+          "Week 10, used by the admin panel (/admin/users). role is ADMIN, ALUMNI or STUDENT. isAlumni is not changed: " +
+          "it says whether the person graduated, not what they may do. Safety rule: the last admin can't be demoted (409).",
+        requestBody: writeBody("UserRole", { role: "ADMIN" }),
+        responses: {
+          200: {
+            description: "The user with the new role (never a password or its hash).",
+            content: json(ref("UserAccount"), { ...exampleUser, isAlumni: true, graduationYear: 2023, role: "ADMIN" }),
+          },
+          400: errorResponse("The body can't be read, or role is missing or not one of the three.", {
+            missingRole: ['"role" is required.', "role"],
+            invalidRole: ['"role" must be ADMIN, ALUMNI or STUDENT.', "role"],
+          }),
+          404: notFound,
+          409: errorResponse("A safety rule refuses the change.", {
+            lastAdmin: ["The last admin can't be demoted. Make another user an admin first."],
+          }),
+          415: unsupportedType,
         },
       },
     },
@@ -359,22 +559,81 @@ export const openApiSpec = {
         tags: ["Applications"],
         summary: "Apply to a job posting",
         description:
-          "Body: the applicant's userId. The posting comes from the URL (a jobPostingId in the body is ignored). " +
-          "status is optional and defaults to applied. A second application by the same user to the same posting " +
-          "is refused by the database's unique pair (userId, jobPostingId): 409.",
-        requestBody: writeBody("ApplicationCreate", { userId: 15 }),
+          "Send no body: nothing in it is used (Week 10). The applicant is always the logged-in user, the posting " +
+          "comes from the URL, and the status is always applied; a userId, jobPostingId or status in a body is ignored. " +
+          "Only the posting's owner or an admin can change the status afterwards (PATCH /api/applications/{id}). " +
+          "A second application by the same user to the same posting is refused by the database's unique pair (userId, jobPostingId): 409.",
         responses: {
-          201: { description: "The created application.", content: json(ref("Application"), exampleApplication) },
-          400: errorResponse("The body can't be read, or userId is missing or not a positive whole number.", {
-            missingUserId: ['"userId" is required.', "userId"],
-            invalidUserId: ['"userId" must be a positive whole number.', "userId"],
-            invalidJson: ["Request body must be valid JSON."],
-          }),
+          201: {
+            description: "The created application, with the logged-in user's id as userId and status applied.",
+            content: json(ref("Application"), exampleApplication),
+          },
           404: jobNotFound,
           409: errorResponse("This user has already applied to this job posting.", {
             duplicate: ["This user has already applied to this job posting.", "jobPostingId"],
           }),
+        },
+      },
+    },
+    "/api/applications/{id}": {
+      parameters: [
+        { name: "id", in: "path", required: true, description: "The application's id.", schema: { type: "integer", minimum: 1, example: 31 } },
+      ],
+      patch: {
+        tags: ["Applications"],
+        summary: "Change an application's status",
+        description:
+          "Only status can be changed; a userId or jobPostingId in the body is ignored. Allowed for the owner of the " +
+          "posting the application is for, or an admin; never for the applicant (Week 10). " +
+          "status must be one of applied, reviewed, hired or rejected (ddd.md); anything else gives 400.",
+        requestBody: writeBody("ApplicationStatus", { status: "reviewed" }),
+        responses: {
+          200: { description: "The updated application.", content: json(ref("Application"), { ...exampleApplication, status: "reviewed" }) },
+          400: errorResponse("The body can't be read, or status is missing or not one of the four.", {
+            missingStatus: ['"status" is required.', "status"],
+            unknownStatus: ['"status" must be one of: applied, reviewed, hired, rejected.', "status"],
+          }),
+          404: notFoundResponse("No application has this id.", { applicationNotFound: "Application 9999 does not exist" }),
           415: unsupportedType,
+        },
+      },
+      delete: {
+        tags: ["Applications"],
+        summary: "Delete an application",
+        description: "Week 10, used by the admin panel (/admin/applications).",
+        responses: {
+          204: { description: "The application was deleted. The response has no body." },
+          404: notFoundResponse("No application has this id.", { applicationNotFound: "Application 9999 does not exist" }),
+        },
+      },
+    },
+    "/api/jobs/{id}": {
+      parameters: [jobIdParam],
+      patch: {
+        tags: ["Job postings"],
+        summary: "Edit a job posting",
+        description:
+          "Week 10, used by the admin panel (/admin/jobs). Only the fields sent change: title (at most 120 characters), company, " +
+          "city, description, and userId to give the posting another owner (an existing user).",
+        requestBody: writeBody("JobPostingUpdate", { title: "Senior Data Analyst", userId: 3 }),
+        responses: {
+          200: { description: "The updated job posting.", content: json(ref("JobPosting"), { ...exampleJobPosting, title: "Senior Data Analyst", userId: 3 }) },
+          400: errorResponse("The body can't be read, no field was sent, or a field is invalid.", {
+            longTitle: ['"title" must be at most 120 characters.', "title"],
+            unknownOwner: ['"userId" must be the id of an existing user.', "userId"],
+            noFields: ["Send at least one of: userId, title, company, city, description."],
+          }),
+          404: jobNotFound,
+          415: unsupportedType,
+        },
+      },
+      delete: {
+        tags: ["Job postings"],
+        summary: "Delete a job posting",
+        description: "Week 10, used by the admin panel. Its applications are deleted too (ON DELETE CASCADE).",
+        responses: {
+          204: { description: "The job posting was deleted. The response has no body." },
+          404: jobNotFound,
         },
       },
     },
@@ -435,6 +694,143 @@ export const openApiSpec = {
             description:
               "Validation error: the page is shown again with the typed values kept and the message under the field, in plain words " +
               "(for example \"Full name is required.\"; the JSON API keeps its own messages).",
+            content: html,
+          },
+        },
+      },
+    },
+    "/login": {
+      get: {
+        tags: ["Users (views)"],
+        summary: "Login page (HTML)",
+        description: "The login form: email and password, and a link to /register.",
+        responses: { 200: { description: "The login page.", content: html } },
+      },
+      post: {
+        tags: ["Users (views)"],
+        summary: "Log in (form on /login)",
+        description:
+          "loginAction -> AuthController.login -> UserModel.authenticate and lib/session.ts, the same as POST /api/login. " +
+          "The Log out button in the header is a POST server action too (logoutAction -> lib/session.ts destroySession).",
+        requestBody: {
+          required: true,
+          content: { "multipart/form-data": { schema: ref("LoginRequest"), example: { email: "ayse.yilmaz@example.com", password: "homecoming-demo" } } },
+        },
+        responses: {
+          303: { description: "Logged in: sets the session cookie and redirects to the home page; the header then shows the user's name and Log out." },
+          200: {
+            description:
+              "Failed: the form again with the email kept (never the password) and \"Email or password is wrong.\" under the form, " +
+              "or \"Email is required.\" / \"Password is required.\" under the missing field.",
+            content: html,
+          },
+        },
+      },
+    },
+    "/admin": {
+      get: {
+        tags: ["Admin (views)"],
+        summary: "Admin dashboard (HTML)",
+        description: "Admin only. Users by role, the counts of announcements, job postings and applications, and links to the sections.",
+        responses: {
+          200: { description: "The dashboard.", content: html },
+          303: { description: "Not logged in: redirects to /login?next=/admin." },
+          403: { description: "Logged in, but not an admin: the 403 page.", content: html },
+        },
+      },
+    },
+    "/admin/announcements": {
+      get: {
+        tags: ["Admin (views)"],
+        summary: "Manage announcements (HTML)",
+        description:
+          "Admin only (Week 10). A table of every announcement (date, title, message) with Edit (/announcements/{id}/edit) and Delete, " +
+          "and the form to post a new one. The forms are server actions that post back to this page.",
+        responses: {
+          200: { description: "The announcements page of the admin panel.", content: html },
+          303: { description: "Not logged in: redirects to /login?next=/admin/announcements. After a form: back here with the result." },
+          403: { description: "Logged in, but not an admin: the 403 page.", content: html },
+        },
+      },
+    },
+    "/admin/jobs": {
+      get: {
+        tags: ["Admin (views)"],
+        summary: "Manage job postings (HTML)",
+        description:
+          "Admin only (Week 10). Every job posting with its owner's name, Edit (/admin/jobs/{id}/edit) and Delete, and the form to " +
+          "create one for any user (choose the owner). The forms are server actions; the API equivalents are POST /api/users/{id}/jobs, " +
+          "PATCH and DELETE /api/jobs/{id}.",
+        responses: {
+          200: { description: "The job postings page of the admin panel.", content: html },
+          303: { description: "Not logged in: redirects to /login?next=/admin/jobs. After a form: back here with the result." },
+          403: { description: "Logged in, but not an admin: the 403 page.", content: html },
+        },
+      },
+    },
+    "/admin/applications": {
+      get: {
+        tags: ["Admin (views)"],
+        summary: "Manage applications (HTML)",
+        description:
+          "Admin only (Week 10). Every application with the applicant, the posting, the date and the status (a dropdown with Save: " +
+          "applied, reviewed, hired or rejected), and Delete. Another status is refused with a message and nothing changes.",
+        responses: {
+          200: { description: "The applications page of the admin panel.", content: html },
+          303: { description: "Not logged in: redirects to /login?next=/admin/applications. After a form: back here with the result." },
+          403: { description: "Logged in, but not an admin: the 403 page.", content: html },
+        },
+      },
+    },
+    "/admin/users": {
+      get: {
+        tags: ["Admin (views)"],
+        summary: "Manage users (HTML)",
+        description:
+          "Admin only. A table with name, email, role (a dropdown with Save), alumni, graduation year, Edit (/users/{id}/edit) and Delete. " +
+          "The Save and Delete buttons are server actions (changeRoleAction, adminDeleteUserAction) that post back to this page; " +
+          "the result is shown at the top, including the message of a safety rule that refused the change.",
+        responses: {
+          200: { description: "The users page of the admin panel.", content: html },
+          303: { description: "Not logged in: redirects to /login?next=/admin/users. After a form: back to /admin/users with the result." },
+          403: { description: "Logged in, but not an admin: the 403 page.", content: html },
+        },
+      },
+    },
+    "/register": {
+      get: {
+        tags: ["Users (views)"],
+        summary: "Register page (HTML)",
+        description:
+          "The register form: full name, email, password, confirm password, role (Alumni or Student), " +
+          "graduation year (shown only when Alumni is chosen) and an optional school.",
+        responses: { 200: { description: "The register page.", content: html } },
+      },
+      post: {
+        tags: ["Users (views)"],
+        summary: "Register (form on /register)",
+        description: "registerAction -> UserController.register -> UserModel.register, the same model function as POST /api/register.",
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: ref("RegisterRequest"),
+              example: {
+                fullName: "Ayşe Yılmaz",
+                email: "ayse.yilmaz@example.com",
+                password: "a-long-password",
+                confirmPassword: "a-long-password",
+                role: "STUDENT",
+              },
+            },
+          },
+        },
+        responses: {
+          303: { description: "Registered: redirects to the new user's page, /users/{id}." },
+          200: {
+            description:
+              "Validation error: the form is shown again with the typed values kept (except the two passwords) and each error " +
+              "under its field, in plain words. A taken email shows \"An account with this email already exists.\"",
             content: html,
           },
         },
@@ -760,7 +1156,7 @@ export const openApiSpec = {
         },
       },
     },
-  })),
+  }))),
   components: {
     responses: {
       InternalServerError: {
@@ -770,16 +1166,67 @@ export const openApiSpec = {
         content: json(ref("InternalServerError"), { error: "Internal server error" }),
       },
     },
+    securitySchemes: {
+      sessionCookie: {
+        type: "apiKey",
+        in: "cookie",
+        name: "homecoming_session",
+        description: "The session cookie set by POST /api/login (httpOnly; the browser sends it by itself).",
+      },
+    },
     schemas: {
+      UserRole: {
+        type: "object",
+        required: ["role"],
+        properties: {
+          role: { type: "string", enum: ["ADMIN", "ALUMNI", "STUDENT"], description: "The new role. The last admin can't be demoted." },
+        },
+      },
+      LoginRequest: {
+        type: "object",
+        required: ["email", "password"],
+        properties: {
+          email: { type: "string", format: "email", description: "Trimmed and lowercased, like on register." },
+          password: { type: "string", format: "password" },
+        },
+      },
       User: {
         type: "object",
-        required: ["id", "fullName", "email", "age"],
+        required: ["id", "fullName", "email"],
         properties: {
           id: { type: "integer", example: 1 },
           fullName: { type: "string", example: "Ayşe Yılmaz" },
           email: { type: "string", format: "email", example: "ayse.yilmaz@example.com" },
+          age: { type: "integer", minimum: 1, example: 24, description: "Left out for users who registered (register doesn't ask for it)." },
+          school: { type: "string", example: "Istanbul University" },
+        },
+      },
+      RegisterRequest: {
+        type: "object",
+        required: ["fullName", "email", "password", "confirmPassword", "role"],
+        properties: {
+          fullName: { type: "string" },
+          email: { type: "string", format: "email", description: "Stored in lowercase; must be unique (a duplicate gives 409)." },
+          password: { type: "string", format: "password", minLength: 8, description: "At least 8 characters. Only its bcrypt hash is stored." },
+          confirmPassword: { type: "string", format: "password", description: "Must be the same as password. Never stored." },
+          role: { type: "string", enum: ["ALUMNI", "STUDENT"], description: "ADMIN can't be chosen." },
+          graduationYear: { type: "integer", minimum: 1950, description: "Required for ALUMNI (1950 to the current year); not allowed for STUDENT." },
+          school: { type: "string" },
+        },
+      },
+      UserAccount: {
+        type: "object",
+        description: "A user with their role and alumni status (register, login, /api/me). It never contains the password or its hash; age is left out when the user has none.",
+        required: ["id", "fullName", "email", "isAlumni", "role"],
+        properties: {
+          id: { type: "integer", example: 21 },
+          fullName: { type: "string", example: "Ayşe Yılmaz" },
+          email: { type: "string", format: "email", example: "ayse.yilmaz@example.com" },
           age: { type: "integer", minimum: 1, example: 24 },
           school: { type: "string", example: "Istanbul University" },
+          isAlumni: { type: "boolean", description: "true for ALUMNI accounts." },
+          graduationYear: { type: "integer", example: 2023, description: "Only for ALUMNI accounts." },
+          role: { type: "string", enum: ["ADMIN", "ALUMNI", "STUDENT"] },
         },
       },
       UserCreate: {
@@ -871,6 +1318,17 @@ export const openApiSpec = {
           createdAt: { type: "string", format: "date-time", example: "2026-10-22T09:00:00.000Z" },
         },
       },
+      JobPostingUpdate: {
+        type: "object",
+        description: "Any of the fields (at least one). userId gives the posting another owner.",
+        properties: {
+          userId: { type: "integer", minimum: 1, description: "The new owner: the id of an existing user." },
+          title: { type: "string", minLength: 1, maxLength: 120 },
+          company: { type: "string", minLength: 1 },
+          city: { type: "string", minLength: 1 },
+          description: { type: "string", minLength: 1 },
+        },
+      },
       JobPostingCreate: {
         type: "object",
         description: "userId is not sent: it comes from the URL, and one in the body is ignored.",
@@ -893,12 +1351,11 @@ export const openApiSpec = {
           createdAt: { type: "string", format: "date-time", example: "2026-10-22T10:00:00.000Z" },
         },
       },
-      ApplicationCreate: {
+      ApplicationStatus: {
         type: "object",
-        required: ["userId"],
+        required: ["status"],
         properties: {
-          userId: { type: "integer", minimum: 1, description: "The applicant's id." },
-          status: { type: "string", minLength: 1, description: "Optional; defaults to applied." },
+          status: { type: "string", enum: ["applied", "reviewed", "hired", "rejected"], example: "reviewed", description: "The new status. Only the posting's owner or an admin may set it." },
         },
       },
       ApplicationWithUser: {
@@ -934,6 +1391,15 @@ export const openApiSpec = {
         properties: {
           error: { type: "string", description: "What went wrong." },
           field: { type: "string", description: "The field that failed validation, if any." },
+        },
+      },
+      Forbidden: {
+        type: "object",
+        description: "The body of every 403 from the JSON API (Week 10): logged in, but this account may not do this.",
+        required: ["error", "reason"],
+        properties: {
+          error: { type: "string", enum: ["Forbidden"], example: "Forbidden" },
+          reason: { type: "string", example: "Only an admin can do this." },
         },
       },
       NotFound: {

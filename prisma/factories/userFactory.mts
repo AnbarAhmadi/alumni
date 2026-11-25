@@ -2,6 +2,14 @@
 // prisma/schema.prisma). Only for the development seed: every person is made up,
 // and every email ends in @example.com, a domain reserved for examples.
 import { fakerTR as faker } from "@faker-js/faker";
+import bcrypt from "bcryptjs";
+
+// DEMO-ONLY password of every seeded user (Week 10). Development data only: never use it
+// for a real account. Hashed with a fixed salt, so every run stores the same hash, and it is
+// the same hash the migration 20261125065612_add_user_roles_and_passwords gave existing rows.
+export const DEMO_PASSWORD = "homecoming-demo";
+const DEMO_SALT = "$2b$10$HomecomingDemoSeedSalt";
+const DEMO_PASSWORD_HASH = bcrypt.hashSync(DEMO_PASSWORD, DEMO_SALT);
 
 // Fixed seed and reference date, so every run creates exactly the same rows.
 const SEED = 2026;
@@ -23,6 +31,8 @@ export type UserSeed = {
   school: string | null;
   isAlumni: boolean;
   graduationYear: number | null;
+  role: "ALUMNI" | "STUDENT"; // never ADMIN: admins are made with npm run make-admin (Week 10)
+  passwordHash: string;
 };
 
 // "Şükrü Çağlar" -> "sukru.caglar": plain ASCII for the email address.
@@ -58,6 +68,12 @@ export function buildUsers(count: number): UserSeed[] {
     // school is optional, so some users have none.
     const school = faker.datatype.boolean({ probability: 0.85 }) ? faker.helpers.arrayElement(SCHOOLS) : null;
 
-    return { fullName: `${firstName} ${lastName}`, email, age, school, isAlumni, graduationYear };
+    // ALUMNI if they graduated, else STUDENT. The seed makes no ADMIN: see npm run make-admin.
+    const role = isAlumni ? "ALUMNI" : "STUDENT";
+
+    return {
+      fullName: `${firstName} ${lastName}`, email, age, school, isAlumni, graduationYear,
+      role, passwordHash: DEMO_PASSWORD_HASH,
+    };
   });
 }

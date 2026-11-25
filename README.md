@@ -33,6 +33,11 @@ This project is being built incrementally over the semester. Status is updated w
 - [x] **Week 6:** Job postings and applications: two new tables (migration and seed), their API (`/api/users/:id/jobs`, `/api/jobs/:id/applications`, `/api/users/:id/applications`) and a user's job postings on the `/users/:id` page
 - [x] **Week 7:** Validation rules for job postings (title required, at most 120 characters), a request logger (`withLogger`), one JSON 404 shape with a reason for the whole API (with a catch-all route), a safe `500` answer for unexpected errors, an error log file (`logs/error.log`) and one generic 404 page for the website
 - [x] **Week 9:** A design system and a new look under the name **Homecoming**: a brand kit ([BRAND.md](BRAND.md)) and design rules ([DESIGN.md](DESIGN.md)), one stylesheet built from CSS variables, one shared layout, a livelier homepage with real numbers and the latest announcements and job postings, redesigned users, announcements and About pages, designed 404 and 500 pages, subtle motion (off for `prefers-reduced-motion`), and one of each component (card, button hover, link, table, form, empty state)
+- [x] **Week 10:** Roles and register: a `role` for every user (`ADMIN`, `ALUMNI`, `STUDENT`) and a `passwordHash` (bcrypt, through `bcryptjs`) in a new migration; a `/register` page (in the shared layout, with a "Register" link in the navigation) and `POST /api/register`, both following the register rules in [ddd.md](ddd.md); the password hash is never returned, shown or logged. The role permissions come later (see Upcoming)
+- [x] **Week 10:** Login and logout: a `sessions` table (new migration) holding only the SHA-256 hash of each session token; a `/login` page; a "Log out" button in the header, which shows "Log in" and "Register" or the logged-in user's name; and `POST /api/login`, `POST /api/logout` and `GET /api/me`. Sessions last 7 days in an `httpOnly` cookie, and an unknown email and a wrong password get the same answer ("Email or password is wrong.")
+
+- [x] **Week 10:** Access rules: every page, form and API endpoint is public, logged in, owner or admin, or admin only, from one rules map (`lib/access.ts`) and one guard (`lib/guard.ts`: `withAuth` for the API, `guardPage` for pages, `guardForm` for server actions; `proxy.ts` sends visitors without a cookie to `/login?next=...` with `303`); a designed 403 page; `401`/`403` JSON for the API; applying always uses the session user; registering logs you in; buttons you may not use are hidden. See Access rules below and in [ddd.md](ddd.md)
+- [x] **Week 10:** Admin panel, part 1: `/admin` (a dashboard with users by role and the counts) and `/admin/users` (change a role, edit, delete), admin only, with an "Admin" link in the header for admins; `PATCH /api/users/:id/role`; safety rules in the model (an admin can't delete themselves, the last admin can't be demoted or deleted); `npm run make-admin -- <email>`, and the seed no longer creates an admin
 
 ### Upcoming
 
@@ -42,7 +47,7 @@ This project is being built incrementally over the semester. Status is updated w
 - [ ] **My Profile:** graduates keep their own contact and career details up to date
 - [ ] **Mentorship:** connect current students with graduates
 - [ ] **Events & Reunions, Careers & Jobs, News & Success Stories, Contact** pages (shown as "Coming soon" on the home page today)
-- [ ] **Authentication:** login and roles
+- [ ] **Accounts:** rate limiting of login attempts, email verification and password reset
 - [ ] **Data export:** export records to CSV and Excel
 
 ---
@@ -59,7 +64,9 @@ This project is being built incrementally over the semester. Status is updated w
 | Database | PostgreSQL 17 in Docker | Runs as a container with a volume; the app reads and writes it |
 | Migrations | Prisma Migrate | Creates the database tables |
 | ORM | Prisma Client with `@prisma/adapter-pg` | Used by the models through one shared client in `lib/prisma.ts` |
-| Logging and errors | `lib/withLogger.ts` and `lib/notFound.ts` (Week 7) | One log line per API request, one JSON 404 shape, a safe `500` answer and `logs/error.log` |
+| Logging and errors | `lib/withLogger.ts` and `lib/notFound.ts` (Week 7) | One log line per API request, one JSON 404 shape, a safe `500` answer and `logs/error.log`; password hashes are redacted from every log (`lib/redact.ts`, Week 10) |
+| Password hashing | `bcryptjs` (Week 10) | Pure JavaScript bcrypt (no native build), cost 10; only the hash is stored |
+| Sessions | `lib/session.ts`, `models/Session.ts` (Week 10) | No extra service: a `sessions` table and an `httpOnly` cookie; the token is 32 random bytes and only its SHA-256 hash is stored (`node:crypto`) |
 | API documentation | OpenAPI 3.0 + Swagger UI | The spec is written in `app/api/swagger/openapi.ts`; Swagger UI is loaded from the unpkg CDN, so it needs an internet connection |
 | Code quality | ESLint 9 with `eslint-config-next` | Next.js core-web-vitals and TypeScript rules |
 | Package manager | npm | |
@@ -75,14 +82,27 @@ Every file that is committed to the repository, with what it does:
 ```
 alumni/
 ├── app/                                  # Next.js App Router: a file's folder path is its URL
-│   ├── layout.tsx                        # The one layout: "Homecoming" wordmark, navigation, one centred column, footer; loads the fonts
+│   ├── layout.tsx                        # The one layout: "Homecoming" wordmark, navigation, one centred column, footer; loads the fonts; reads the logged-in user for the header
 │   ├── page.tsx                          # Home page (/): hero band, real counts (count up once), the 3 newest announcements and job postings, "Coming soon"
+│   ├── forbidden.tsx                     # The 403 page (Week 10): "Your account can't open this page.", shown by the access guard
 │   ├── not-found.tsx                     # The one 404 page of the website: unknown URLs (/banana) and unknown ids (/users/9999) (Week 7, designed in Week 9)
 │   ├── error.tsx                         # The 500 page of the website (inside the layout): "Something went wrong on our side.", Try again (Week 9)
 │   ├── global-error.tsx                  # The 500 page used only if the root layout itself fails; brings its own <html>, styles and fonts (Week 9)
 │   ├── globals.css                       # The one stylesheet, built from the DESIGN.md variables (colours, fonts, spacing, radius)
+│   ├── admin/                            # The admin panel (Week 10), admin only
+│   │   ├── page.tsx                      # /admin: the dashboard (users by role, counts, sections)
+│   │   └── users/
+│   │       ├── page.tsx                  # /admin/users: users with role dropdown, Edit, Delete and the safety-rule messages
+│   │       └── actions.ts                # Server actions: changeRoleAction, adminDeleteUserAction (guardForm)
 │   ├── about/
 │   │   └── page.tsx                      # About page (/about): what the system is for
+│   ├── login/                            # The login page (Week 10)
+│   │   ├── page.tsx                      # /login: "Log in" with the login form
+│   │   └── actions.ts                    # Server actions: loginAction (303 to /) and logoutAction (the header's Log out button)
+│   ├── register/                         # The register page (Week 10)
+│   │   ├── page.tsx                      # /register: "Create an account" with the register form
+│   │   └── actions.ts                    # Server action: UserController.register, then 303 to /users/:id
+
 │   ├── users/                            # The users web pages (HTML)
 │   │   ├── page.tsx                      # /users: users table and the "Add a user" form
 │   │   ├── actions.ts                    # Server actions for the forms: create, update and delete
@@ -102,6 +122,14 @@ alumni/
 │   │   │   └── route.ts                  # Any unknown /api path, any method: 404 { "error": "Not found", "reason": "No route GET /api/..." } (Week 7)
 │   │   ├── health/
 │   │   │   └── route.ts                  # GET /api/health: says the server is running
+│   │   ├── register/
+│   │   │   └── route.ts                  # POST /api/register → ApiUserController.register (Week 10)
+│   │   ├── login/
+│   │   │   └── route.ts                  # POST /api/login → ApiAuthController.login (Week 10)
+│   │   ├── logout/
+│   │   │   └── route.ts                  # POST /api/logout → ApiAuthController.logout (Week 10)
+│   │   ├── me/
+│   │   │   └── route.ts                  # GET /api/me → ApiAuthController.me (Week 10)
 │   │   ├── users/
 │   │   │   ├── route.ts                  # GET and POST /api/users → ApiUserController
 │   │   │   └── [id]/
@@ -110,6 +138,9 @@ alumni/
 │   │   │       │   └── route.ts          # GET and POST /api/users/:id/jobs → ApiUserJobController
 │   │   │       └── applications/
 │   │   │           └── route.ts          # GET /api/users/:id/applications → ApiApplicationController
+│   │   ├── applications/
+│   │   │   └── [id]/
+│   │   │       └── route.ts              # PATCH /api/applications/:id: change the status (posting owner or admin) (Week 10)
 │   │   ├── jobs/
 │   │   │   └── [id]/
 │   │   │       └── applications/
@@ -132,16 +163,20 @@ alumni/
 │           └── [number2]/
 │               └── route.ts              # GET /sum/:number1/:number2: adds the two numbers
 ├── models/                               # MODEL
-│   ├── User.ts                           # User type, validation, UserModel CRUD on the users table (Prisma)
+│   ├── User.ts                           # User type, validation, UserModel CRUD on the users table (Prisma), and register (Week 10)
 │   ├── Announcement.ts                   # Announcement type, validation, AnnouncementModel CRUD on the announcements table (Prisma)
 │   ├── JobPosting.ts                     # JobPosting type, validation, JobPostingModel CRUD on job_postings (used by /api/users/:id/jobs)
+│   ├── Session.ts                        # SessionModel: create, find by token hash and delete sessions rows (Week 10)
 │   └── Application.ts                    # Application type, validation, ApplicationModel CRUD on applications (used by the application endpoints)
 ├── controllers/                          # CONTROLLERS
+│   ├── ApiAuthController.ts              # For /api/login, /api/logout and /api/me: JSON with 200, 204, 400 and 401 (Week 10)
+│   ├── AuthController.ts                 # For the /login form, the Log out button and the header's current user (Week 10)
 │   ├── ApiUserController.ts              # For /api/users: calls UserModel and returns JSON with status codes
 │   ├── ApiUserJobController.ts           # For /api/users/:id/jobs: a user's job postings (JobPostingModel), JSON with status codes
 │   ├── ApiApplicationController.ts       # For /api/jobs/:id/applications and /api/users/:id/applications (409 for a repeat)
 │   ├── UserController.ts                 # For the /users forms and the edit page: calls UserModel and returns { ok, data, error, field }
 │   ├── ApiAnnouncementController.ts      # For /api/announcements: calls AnnouncementModel and returns JSON with status codes
+│   ├── AdminController.ts                # For /admin and /admin/users: counts, users with roles, change role, delete (Week 10)
 │   ├── AnnouncementController.ts         # For /announcements: calls AnnouncementModel and returns { ok, data, error, field }
 │   ├── HomeController.ts                 # For /: read-only counts and the newest announcements and job postings (Week 9)
 │   └── UserDirectoryController.ts        # For /users and /users/:id: read-only users with their alumni status (Week 9)
@@ -149,6 +184,8 @@ alumni/
 │   ├── UserTable.tsx                     # Table of users: name (link), email, school, alumni badge, graduation year, Edit, Delete
 │   ├── UserDetails.tsx                   # Profile header: initials avatar, name, alumni badge, email, school, graduation year
 │   ├── UserForm.tsx                      # Create and edit form; shows errors under the right field (client component)
+│   ├── LoginForm.tsx                     # The login form: email kept on an error, the generic error under the form (client component, Week 10)
+│   ├── RegisterForm.tsx                  # The register form: every error under its field, graduation year only for Alumni (client component, Week 10)
 │   ├── DeleteUserButton.tsx              # Delete button that asks "Delete <name>?" first (client component)
 │   ├── StatusPage.tsx                    # The shared look of the 404 and 500 pages: large serif code, one line, buttons
 │   ├── EmptyState.tsx                    # The one empty state: a dashed frame, one sentence, an optional button
@@ -157,20 +194,28 @@ alumni/
 │   ├── SiteFooter.tsx                    # The footer (layout and global-error)
 │   ├── friendlyError.ts                  # Turns model messages into plain form messages ("fullName" is required. -> Full name is required.)
 │   ├── JobPostingTable.tsx               # A user's job postings (title, company, city), or "No postings yet."
+│   ├── AdminUserTable.tsx                # The /admin/users table: role dropdown with Save, Edit, Delete (Week 10)
 │   ├── AnnouncementList.tsx              # Announcements as cards, newest first: date badge, title, 2-line preview, Read more, Edit, Delete
 │   ├── AnnouncementDetails.tsx           # One announcement's date and full message; formats the createdAt date
 │   ├── AnnouncementForm.tsx              # Create and edit form: labels above fields, errors under the right field (client component)
 │   └── DeleteAnnouncementButton.tsx      # Reuses DeleteUserButton with the announcement title in the confirmation
 ├── lib/                                  # Helpers shared by the routes, controllers and models
+│   ├── access.ts                         # THE access rules map (Week 10): one rule per page, form and endpoint, decide(), can(), safeNext()
+│   ├── guard.ts                          # The access guard (Week 10): withAuth (API), guardPage (pages), guardForm (server actions)
+│   ├── sessionCookie.ts                  # The session cookie's name, shared by lib/session.ts and proxy.ts (Week 10)
 │   ├── notFound.ts                       # The one JSON 404 answer of the API: { "error": "Not found", "reason": "..." } (Week 7)
 │   ├── parseBody.ts                      # Reads JSON, multipart/form-data and urlencoded bodies; turns age and ids into numbers
 │   ├── prisma.ts                         # The one shared Prisma Client (pg adapter), reused across hot reloads
+│   ├── redact.ts                         # Replaces bcrypt hashes with [redacted] in errors and logs (Week 10)
+│   ├── session.ts                        # createSession, getCurrentUser, destroySession: the session cookie and token (Week 10)
 │   └── withLogger.ts                     # Wraps every /api route handler: one log line per request, safe 500 answer, logs/error.log (Week 7)
+├── scripts/
+│   └── make-admin.mts                    # npm run make-admin -- <email>: makes a registered user an ADMIN (Week 10)
 ├── prisma/                               # Database structure (Prisma Migrate) and the development seed
-│   ├── schema.prisma                     # The four tables (users, announcements, job_postings, applications), following ddd.md
+│   ├── schema.prisma                     # The five tables (users, announcements, job_postings, applications, sessions) and the Role enum, following ddd.md
 │   ├── seed.mts                          # Development seed: fake users, announcements, job postings and applications
 │   ├── factories/                        # One Faker factory per table (fixed seed, so every run is the same)
-│   │   ├── userFactory.mts               # Fake users
+│   │   ├── userFactory.mts               # Fake users, with a role and the demo-only password hash
 │   │   ├── announcementFactory.mts       # Fake announcements
 │   │   ├── jobPostingFactory.mts         # Fake job postings (2 or 3 per user given)
 │   │   └── applicationFactory.mts        # Fake applications (different user/posting pairs)
@@ -179,10 +224,15 @@ alumni/
 │       │   └── migration.sql             # First migration: creates the users and announcements tables
 │       ├── 20261021223924_add_job_postings_applications/
 │       │   └── migration.sql             # Second migration: creates job_postings and applications with their foreign keys
+│       ├── 20261125065612_add_user_roles_and_passwords/
+│       │   └── migration.sql             # Third migration (Week 10): Role enum, users.role and users.passwordHash, optional age; fills in existing users
+│       ├── 20261125071955_add_sessions/
+│       │   └── migration.sql             # Fourth migration (Week 10): the sessions table, with its foreign key to users
 │       └── migration_lock.toml           # Records the database provider (postgresql); written by Prisma
+├── proxy.ts                              # Runs before pages (Week 10): no session cookie on a protected page -> 303 to /login?next=...
 ├── prisma.config.ts                      # Prisma CLI settings: schema and migrations paths, DATABASE_URL from .env
 ├── eslint.config.mjs                     # ESLint setup (Next.js recommended rules + TypeScript rules)
-├── next.config.ts                        # Next.js settings (output: "standalone")
+├── next.config.ts                        # Next.js settings (output: "standalone"; experimental.authInterrupts for forbidden(), Week 10)
 ├── tsconfig.json                         # TypeScript settings; "@/..." imports start at the project root
 ├── package.json                          # Project name, npm scripts and dependencies
 ├── package-lock.json                     # Exact installed versions of the dependencies
@@ -228,8 +278,8 @@ In Next.js the `app/` folder is the router: where a file is decides its URL. The
 
 Users have **three controllers** for the **same model**, because the clients need different answers:
 
-- **`ApiUserController`** is for programs (curl, Postman, Swagger). It returns JSON with HTTP status codes (`200`, `201`, `204`, `400`, `404`, `409`, `415`); an unexpected error becomes `500` in `withLogger`.
-- **`UserController`** is for the web forms (create, edit, delete) and the edit page. It returns a result object `{ ok, data, error, field }`, and the page decides which view to show.
+- **`ApiUserController`** is for programs (curl, Postman, Swagger). It returns JSON with HTTP status codes (`200`, `201`, `204`, `400`, `404`, `409`, `415`); an unexpected error becomes `500` in `withLogger`. It also answers `POST /api/register` (Week 10).
+- **`UserController`** is for the web forms (create, edit, delete, and register since Week 10) and the edit page. It returns a result object `{ ok, data, error, field }` (register adds `errors`, every invalid field), and the page decides which view to show. Register on the page and on the API call the same model function, `UserModel.register`.
 - **`UserDirectoryController`** (Week 9) only reads: the `/users` table and the `/users/:id` profile, with the alumni status. `HomeController` does the same for the homepage numbers and latest items.
 
 All of them reach the data only through `UserModel`, which stores it in PostgreSQL. Moving from memory to the database changed only the model files, plus `await` in the controllers, pages and server actions that call them.
@@ -270,12 +320,19 @@ Both models have the same CRUD functions (`getAll`, `getById`, `create`, `update
 | --- | --- | --- |
 | `/` | GET | Home page: a hero band, the number of users, announcements and job postings (read from the database), the 3 newest announcements and job postings, and a "Coming soon" line. If the database can't be reached, it still shows, with a short message instead of the numbers |
 | `/about` | GET | About Homecoming: why it exists, what you can do today, what comes next |
+| `/register` | GET | "Create an account" (Week 10): full name, email, password, confirm password, Alumni or Student, graduation year (shown only for Alumni) and an optional school |
+| `/register` | POST (form) | Register. On success, the new user is logged in (Week 10) and gets a `303` redirect to their page `/users/:id`. On an error, the same form again with what was typed (except the passwords) and each error under its field, in `--color-danger`; a taken email shows "An account with this email already exists." |
+| `/login` | GET | "Log in" (Week 10): email and password, and a link to `/register` |
+| `/login` | POST (form) | Log in. On success, the session cookie and a `303` redirect to the home page. On a failure, the same form with the email kept (never the password) and "Email or password is wrong." in `--color-danger`, or "Email is required." / "Password is required." under the missing field |
+| Any page | POST (form) | The header's "Log out" button (only when logged in): deletes the session, clears the cookie and redirects (`303`) to the home page. Logged out, the header shows "Log in" and "Register"; logged in, the user's name (a link to their page) and "Log out" |
 | `/users` | GET | Table of all users (name, email, school, alumni badge, graduation year) , a count line ("20 users, 12 of them alumni."), and the "Add a user" form; "No users yet. Add the first one." when there are none |
 | `/users` | POST (form) | Add a user, or delete one from a table row |
 | `/users/:id` | GET | The user's profile (initials avatar, name, email, school, graduation year) with Edit and Delete, and a table of their job postings ("No postings yet." if none) |
 | `/users/:id` | POST (form) | Delete the user |
 | `/users/:id/edit` | GET | Edit form filled with the user's data |
 | `/users/:id/edit` | POST (form) | Save changes (only the filled-in fields change) |
+| `/admin` | GET | Admin only (Week 10): the dashboard: users by role (admins, alumni, students), the number of announcements, job postings and applications, and the sections (Users; Announcements, Job postings and Applications come next) |
+| `/admin/users` | GET, POST (forms) | Admin only (Week 10): every user with name, email, role, alumni and graduation year; a role dropdown with Save, Edit (`/users/:id/edit`) and Delete. A safety rule that blocks a change is shown at the top in plain words, for example "You can't delete your own admin account." |
 | `/announcements` | GET | A count line ("5 announcements."), the announcements as cards, newest first (date, title, 2-line preview, Read more), and the "Post an announcement" form; "No announcements yet. Post the first one." when there are none |
 | `/announcements` | POST (form) | Post an announcement, or delete one from its card |
 | `/announcements/:id` | GET | One announcement: title, date and full message, a link back to the list, and Edit and Delete buttons |
@@ -295,11 +352,17 @@ The `POST` rows are form submissions handled by server actions. An unknown or in
 | GET | `/api/users/:id` | — | `200` user, with their job postings in a `jobs` array (`[]` if none) | `404` not found |
 | PUT | `/api/users/:id` | `fullName`, `email`, `age`, `school` (all required) | `200` updated user | `400`, `404`, `409`, `415` |
 | PATCH | `/api/users/:id` | Any of `fullName`, `email`, `age`, `school` (at least one) | `200` updated user | `400`, `404`, `409`, `415` |
-| DELETE | `/api/users/:id` | — | `204` no body | `404` not found |
+| DELETE | `/api/users/:id` | — | `204` no body | `404` not found, `409` a safety rule: an admin can't delete their own account, and the last admin can't be deleted (Week 10) |
+| PATCH | `/api/users/:id/role` (Week 10, admin only) | `role`: `ADMIN`, `ALUMNI` or `STUDENT` | `200` the user with the new role (never a hash) | `400` missing or unknown role, `401`, `403`, `404`, `409` the last admin can't be demoted, `415` |
+| POST | `/api/register` (Week 10) | `fullName`, `email`, `password` (at least 8 characters), `confirmPassword` (the same), `role` (`ALUMNI` or `STUDENT`), `graduationYear` (required for `ALUMNI`, 1950 to the current year; not allowed for `STUDENT`), `school` (optional) | `201` the new user with `role`, `isAlumni` and `graduationYear`, never the password or its hash | `400` the first invalid field (`role: "ADMIN"` too), `409` email already used, `415` unsupported Content-Type |
+| POST | `/api/login` (Week 10) | `email`, `password` (both required) | `200` the user (as for register, never a hash) and a `Set-Cookie` with `homecoming_session` (`HttpOnly`, `SameSite=Lax`, `Path=/`, 7 days; `Secure` in production) | `400` a field is missing (`field`), `401` `{ "error": "Email or password is wrong." }` for an unknown email or a wrong password, `415` |
+| POST | `/api/logout` (Week 10) | — (the cookie) | `204`, the session row deleted and the cookie cleared; also `204` when not logged in | — |
+| GET | `/api/me` (Week 10) | — (the cookie) | `200` the logged-in user | `401` `{ "error": "Not logged in." }` without a cookie, or for an unknown or expired session (an expired one is deleted and its cookie cleared) |
 | GET | `/api/users/:id/jobs` | — | `200` array of that user's job postings | `404` user not found |
 | POST | `/api/users/:id/jobs` | `title` (required, at most 120 characters), `company` (required), `city`, `description` (optional); the user comes from the URL, and a `userId` in the body is ignored | `201` new job posting (with `userId`) | `400` invalid data, `404` user not found, `415` unsupported Content-Type |
 | GET | `/api/users/:id/applications` | — | `200` the postings the user applied to, each with `jobPosting` (`id`, `title`, `company`) | `404` user not found |
-| POST | `/api/jobs/:id/applications` | `userId` (required: the applicant), `status` (optional, default `applied`); the posting comes from the URL | `201` new application | `400` missing or non-numeric `userId`, `404` posting or user not found, `409` this user already applied to this posting, `415` unsupported Content-Type |
+| POST | `/api/jobs/:id/applications` | None: the body isn't read (Week 10). The applicant is always the logged-in user and the status is always `applied`; a `userId` or `status` sent is ignored. The posting comes from the URL | `201` new application | `401` not logged in, `404` posting not found, `409` this user already applied to this posting |
+| PATCH | `/api/applications/:id` (Week 10) | `status` (required, not empty); a `userId` or `jobPostingId` is ignored. Only the owner of the posting or an admin, never the applicant | `200` updated application | `400` missing or empty `status`, `401`, `403`, `404` application not found, `415` |
 | GET | `/api/jobs/:id/applications` | — | `200` the applications to the posting, each with `user` (`id`, `fullName`) | `404` posting not found |
 | GET | `/api/announcements` | — | `200` array of announcements | — |
 | POST | `/api/announcements` | `title`, `content` (required), `author` (optional) | `201` new announcement | `400` invalid data, `415` unsupported Content-Type |
@@ -313,6 +376,8 @@ Any of these can also answer `500` `{ "error": "Internal server error" }` if som
 
 An announcement's `createdAt` is always set by the server, and a `createdAt` sent in the body is ignored.
 
+**Passwords (Week 10).** Only a bcrypt hash of a password is stored (`users.passwordHash`). No endpoint or page ever returns it, and the `/api/users` answers are exactly the same as before. Users created through `/api/users` or the `/users` form get the role `STUDENT` and the hash of a random password nobody knows. Users who registered have no `age`, so the API leaves that key out for them.
+
 POST, PUT and PATCH accept `application/json`, `multipart/form-data` and `application/x-www-form-urlencoded`. An `id` sent in the body is always ignored: new ids are generated, and other ids come from the URL.
 
 **Job posting rules (Week 7):** `title` is required and at most 120 characters after trimming, `company` is required, and `city` and `description` are optional (if sent, they must not be empty). A 121-character title gives `400` `{ "error": "\"title\" must be at most 120 characters.", "field": "title" }`. The limit is checked by the app only; the database column has no length limit. See [ddd.md](ddd.md).
@@ -323,7 +388,7 @@ POST, PUT and PATCH accept `application/json`, `multipart/form-data` and `applic
 | --- | --- | --- |
 | `400` | Invalid data, or the body can't be read | `{ "error": "...", "field": "..." }` (`field` only when one field is to blame) |
 | `404` | Unknown id, or unknown path under `/api` (Week 7) | Always `{ "error": "Not found", "reason": "..." }`, for example `"User 9999 does not exist"`, `"Job posting 9999 does not exist"` or `"No route GET /api/banana"` |
-| `409` | The email is already used, or the user already applied to this posting | `{ "error": "...", "field": "email" }` or `{ "error": "...", "field": "jobPostingId" }` |
+| `409` | The email is already used (also on register), or the user already applied to this posting | `{ "error": "...", "field": "email" }` or `{ "error": "...", "field": "jobPostingId" }` |
 | `415` | Unsupported `Content-Type` on POST, PUT or PATCH | `{ "error": "Unsupported Content-Type ..." }` |
 | `500` | Any unexpected error, for example the database is down (Week 7) | Always `{ "error": "Internal server error" }`: no stack trace and no internal message |
 
@@ -352,12 +417,15 @@ With the app running (`npm run dev`), open the Swagger UI:
 
 The raw OpenAPI spec is at http://localhost:3000/api/swagger/openapi.json. Swagger UI is loaded from the unpkg CDN, so the page needs an internet connection.
 
-Swagger groups the routes into eight tags:
+Swagger groups the routes into eleven tags:
 
 - **Users:** the JSON API. Each operation shows its request body (as JSON or form-data), its response codes and examples. Use **Try it out** to send real requests from the browser.
+- **Register:** `POST /api/register` (Week 10), with an example for every `400` rule and the `409`.
+- **Login:** `POST /api/login`, `POST /api/logout` and `GET /api/me` (Week 10). Try it out uses the browser's cookie, so after `POST /api/login` the other two work as that user.
+- **Admin (views):** the admin panel pages `/admin` and `/admin/users` (Week 10). The role change itself is `PATCH /api/users/{id}/role` under Users.
 - **Job postings:** a user's job postings, `GET` and `POST /api/users/{id}/jobs`. The user comes from the URL.
 - **Applications:** `POST` and `GET /api/jobs/{id}/applications` (apply, and list the applicants with their names) and `GET /api/users/{id}/applications` (the postings a user applied to).
-- **Users (views):** the `/users` HTML pages and their forms. The form submissions are server actions, so they are documented but can't be sent with Try it out.
+- **Users (views):** the `/users` HTML pages and their forms, and the `/register` page. The form submissions are server actions, so they are documented but can't be sent with Try it out.
 - **Announcements:** the announcements JSON API, documented the same way as Users.
 - **Announcements (views):** the `/announcements` HTML pages and their forms.
 - **Health:** `/api/health`.
@@ -377,7 +445,7 @@ Next.js has no `app.use()`, and `proxy.ts` runs before a route, so it never sees
 10:20:30 POST /api/users 201 18 ms
 ```
 
-That is the time, method, path, status code and duration. Request bodies are never logged. Error answers (`400`, `404`, `409`, `415`, `500`) are logged too. The web pages, `/hello` and `/sum` are not wrapped, so they are not logged.
+That is the time, method, path, status code and duration. Request bodies are never logged. Prisma's error messages print a failed query's arguments, so bcrypt password hashes are replaced with `[redacted]` before an error reaches the terminal or `logs/error.log` (Week 10, `lib/redact.ts`). Error answers (`400`, `404`, `409`, `415`, `500`) are logged too. The web pages, `/hello` and `/sum` are not wrapped, so they are not logged.
 
 **404 Guardian.** Every `404` of the API has the same body, built by `lib/notFound.ts`: `{ "error": "Not found", "reason": "User 9999 does not exist" }`. The controllers use it for unknown ids. The catch-all route `app/api/[[...slug]]/route.ts` answers any unknown path under `/api`, for every method: `GET /api/banana` → `{ "error": "Not found", "reason": "No route GET /api/banana" }`. Next.js always prefers a more specific route, so the catch-all never hides a real one.
 
@@ -399,6 +467,25 @@ Error [PrismaClientKnownRequestError]: ...
 **404 page (website).** `app/not-found.tsx` is the one 404 page of the website, shown inside the normal header and footer: a large serif "404", "There is no page at this address." and a "Back to the home page" button (Week 9 design). Next.js shows it for any unknown page URL (`/banana`) and whenever a page calls `notFound()`, which the `/users/:id` and `/announcements/:id` pages (and their `/edit` pages) do for an unknown or invalid id (`/users/9999`, `/users/abc`). The status is `404`. The API never shows this page; it keeps its JSON 404.
 
 **500 page (website, Week 9).** `app/error.tsx` is shown inside the header and footer when a page fails on the server, for example `/users` while the database is stopped: a large serif "500", "Something went wrong on our side.", a "Try again" button and a link home. The status is `500`. It never shows the error message, a digest or a stack trace; the full error is only in the server's terminal. "Try again" calls Next.js's `retry()`, which fetches the page again, so it works as soon as the database is back. `app/global-error.tsx` is the same page for the rare case where the root layout itself fails. The pages share `components/StatusPage.tsx`. In development (`npm run dev`), Next.js shows its own error overlay with the stack instead; the 500 page is what visitors see in production.
+
+---
+
+## 🔒 Access rules (Week 10)
+
+Every page, form and API endpoint has one rule, written once in `lib/access.ts` and explained in [ddd.md](ddd.md) (Access rules):
+
+| Rule | Pages and forms | API |
+| --- | --- | --- |
+| **public** | `/`, `/about`, `/login`, `/register`, `/announcements`, `/announcements/:id`, the 404, 403 and 500 pages, Log out | `POST /api/login`, `/api/register`, `/api/logout`; `GET /api/announcements(/:id)`; Swagger; `/api/health`, `/hello`, `/sum` (no data) |
+| **logged in** | `/users`, `/users/:id` | `GET /api/me`, `/api/users`, `/api/users/:id`, `/api/users/:id/jobs`; `POST /api/jobs/:id/applications` (apply as yourself; the status is always `applied`) |
+| **owner or admin** | `/users/:id/edit` and its form; Delete a user | `PUT`/`PATCH`/`DELETE /api/users/:id`; `GET /api/users/:id/applications`; `GET /api/jobs/:id/applications` and `PATCH /api/applications/:id` (change the status) (the posting's owner, never the applicant) |
+| **admin only** | `/admin`, `/admin/users` and its forms (change a role, delete); "Add a user"; "Post an announcement", `/announcements/:id/edit` and Delete an announcement | `POST /api/users`, `PATCH /api/users/:id/role`, `POST /api/users/:id/jobs`, `POST /api/announcements`, `PUT`/`PATCH`/`DELETE /api/announcements/:id` |
+
+**What happens otherwise.** Pages: not logged in → `303` to `/login?next=<path>` (after logging in you come back to `<path>`; only relative paths on this site are followed), wrong role or not the owner → the 403 page. API: `401` `{ "error": "Not logged in." }` or `403` `{ "error": "Forbidden", "reason": "Only an admin can do this." }`, both logged by `withLogger`.
+
+**How it is built.** `withAuth` wraps the API handlers like `withLogger` does; pages call `guardPage` and every server action calls `guardForm` itself, because an action can be called with a POST to any page; `proxy.ts` answers the cookie-less case early with a `303`. All of them ask the same `decide()` in `lib/access.ts`. This fits Next.js 16: proxy only sees the request (no database, no server-action target), so the real check sits in each route, page and action. Buttons you may not use are hidden with `can()` from the same map; that is only looks, the guard is the real check.
+
+**Try it** with the seeded users (demo-only password `homecoming-demo`; they are `ALUMNI` or `STUDENT`) and an admin you make yourself with `npm run make-admin` (see Getting Started, step 6).
 
 ---
 
@@ -432,7 +519,13 @@ New pages, after:
 ## ⚠️ Current Limitations
 
 - **The database must be running.** Users and announcements are stored in PostgreSQL, so the `db` container must be up and the migrations applied (see the Database section). Without it, the pages show the 500 page (the homepage still shows, without its numbers) and the API answers `500` `{ "error": "Internal server error" }`; both work again as soon as the database is back. Running the seed deletes all users, announcements, job postings and applications and inserts fake data.
-- **No login.** Authentication is deferred, so anyone who can open the site can create, edit and delete users, on the pages and through the API.
+- **A refused form without JavaScript shows the 404 page.** When the access guard refuses a form sent by a browser without JavaScript, Next.js renders its "not found" page instead of the 403 page. With JavaScript it is the 403 page. Either way nothing is changed.
+- **An expired cookie redirects with `307`.** Without a cookie, a protected page answers `303` to `/login` (from `proxy.ts`); with a cookie that no longer works, the page itself redirects, and Next.js uses `307` there.
+- **No rate limiting.** Nothing limits how many login attempts can be made, so passwords can be guessed without a slowdown.
+- **No email verification.** Anyone can register with any email address, including one that isn't theirs. There is no password reset either.
+- **Old sessions are deleted only when used.** An expired session's row is removed the next time its cookie is sent; rows of browsers that never come back stay until the seed (or a later clean-up job) removes them.
+- **Demo-only password.** Every seeded user (and every user that existed before the Week 10 migration) has the password **`homecoming-demo`**. It is for development only, is written in this README and in the code, and must never be used for a real account or on a hosted database.
+- **Users from `/api/users` and the `/users` form can't sign in.** They get the hash of a random password, and there is no password reset yet.
 - **The edit form can't clear a field.** Empty fields keep their old value, so `school` can't be removed from the web form. A `PUT` through the API replaces the whole user.
 - **No search, sorting or paging** on the users list.
 - **No automated tests yet.** Routes have been checked by hand, with curl, Postman and Swagger.
@@ -471,15 +564,18 @@ Then open:
 | http://localhost:3000/api/health | Health check |
 | http://localhost:3000/banana | The generic "Page not found" page (any unknown URL) |
 
-To try the API from a terminal, create a user with curl:
+To try the API from a terminal, log in as an admin (one you made with `npm run make-admin`, see step 6 below) and create a user with curl. Creating users is admin only (Week 10):
 
 ```bash
-curl -i -X POST http://localhost:3000/api/users \
+curl -c cookies.txt -X POST http://localhost:3000/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<your admin email>","password":"<your password>"}'
+curl -i -b cookies.txt -X POST http://localhost:3000/api/users \
   -H "Content-Type: application/json" \
   -d '{"fullName":"Zeynep Arslan","email":"zeynep.arslan@example.com","age":23,"school":"Istanbul University"}'
 ```
 
-A successful request returns `201 Created` with the new user.
+A successful request returns `201 Created` with the new user. Without the cookie it is `401`, and as a non-admin `403`.
 
 ### Environment Variables
 
@@ -585,7 +681,7 @@ The app's own users and announcements are stored in this database too, so they s
 
 A migration is a versioned SQL file that changes the database structure (for example, creates a table), so every copy of the database can be brought to the same structure step by step.
 
-The tables are defined in `prisma/schema.prisma`, and Prisma Migrate turns them into SQL in `prisma/migrations/`. The first migration, `init`, creates the `users` and `announcements` tables; the second, `add_job_postings_applications` (Week 6), adds `job_postings` and `applications`. Prisma runs on your computer, so it needs `DATABASE_URL` in `.env` (see Environment Variables).
+The tables are defined in `prisma/schema.prisma`, and Prisma Migrate turns them into SQL in `prisma/migrations/`. The first migration, `init`, creates the `users` and `announcements` tables; the second, `add_job_postings_applications` (Week 6), adds `job_postings` and `applications`; the third, `add_user_roles_and_passwords` (Week 10), adds the `Role` enum, `users.role` and `users.passwordHash`, makes `users.age` optional, and gives the existing users a role (user 1 `ADMIN`, the others `ALUMNI` or `STUDENT`) and the hash of the demo-only password `homecoming-demo`; the fourth, `add_sessions` (Week 10), adds the `sessions` table for login. Prisma runs on your computer, so it needs `DATABASE_URL` in `.env` (see Environment Variables).
 
 ```bash
 docker compose up -d db        # start only the database
@@ -625,13 +721,13 @@ docker compose up -d db
 docker compose ps db
 ```
 
-**3. Run the migrations.** This applies every migration in `prisma/migrations/` that the database doesn't have yet. On a fresh database it creates all four tables: `users`, `announcements`, `job_postings` and `applications`.
+**3. Run the migrations.** This applies every migration in `prisma/migrations/` that the database doesn't have yet. On a fresh database it creates all five tables: `users`, `announcements`, `job_postings`, `applications` and `sessions`.
 
 ```bash
 npx prisma migrate deploy
 ```
 
-**4. Run the seed.** First generate the Prisma Client (it is git-ignored, so a fresh clone doesn't have it). Then fill the tables with fake development data: the seed empties all four tables and inserts 20 fake users, 5 fake announcements, 2 or 3 job postings for each of the first 10 users (25 in total), and 30 applications between random users and postings (never the same pair twice), made with Faker using a fixed seed, so every run gives the same rows. Running it again never adds duplicates. It refuses to run when `NODE_ENV` is `production`. See [ddd.md](ddd.md).
+**4. Run the seed.** First generate the Prisma Client (it is git-ignored, so a fresh clone doesn't have it). Then fill the tables with fake development data: the seed empties all five tables (so everyone is logged out) and inserts 20 fake users (user 1 is `ADMIN`, the others `ALUMNI` or `STUDENT`; all with the **demo-only** password `homecoming-demo`, never for real accounts), 5 fake announcements, 2 or 3 job postings for each of the first 10 users (25 in total), and 30 applications between random users and postings (never the same pair twice), made with Faker using a fixed seed, so every run gives the same rows. Running it again never adds duplicates. It refuses to run when `NODE_ENV` is `production`. **The seed is for development only:** it deletes everything and inserts fake people with the demo-only password, and it creates **no admin** (see step 6). See [ddd.md](ddd.md).
 
 ```bash
 npx prisma generate
@@ -643,6 +739,26 @@ npx prisma db seed
 ```bash
 npm run dev
 ```
+
+**6. Make yourself an admin.** The seed creates **no** admin (its users are `ALUMNI` or `STUDENT`). Register your own account on http://localhost:3000/register, then promote it from a terminal:
+
+```bash
+npm run make-admin -- you@example.com
+```
+
+It prints for example `Ayşe Yılmaz (you@example.com, id 21) is now an admin (was STUDENT).`, or `No user has the email "…"` (exit code `1`) if nobody registered with that email. It only promotes, and never prints a password or hash. Log out and in again, or just reload: the header now shows **Admin**, and `/admin` opens. Later admins can be made on `/admin/users`. Run the seed again and your account is gone too, so register and run `make-admin` again afterwards.
+
+**7. Log in** at http://localhost:3000/login with your account, or with any seeded user's email (from `/users`) and the **demo-only** password `homecoming-demo`. From a terminal:
+
+```bash
+curl -i -c cookies.txt -X POST http://localhost:3000/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<a seeded email>","password":"homecoming-demo"}'
+curl -b cookies.txt http://localhost:3000/api/me          # 200 with the user
+curl -b cookies.txt -X POST http://localhost:3000/api/logout   # 204
+```
+
+The seed empties `sessions` too, so running it logs everyone out.
 
 ### Throw the container away
 

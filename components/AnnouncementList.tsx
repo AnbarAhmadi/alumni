@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Announcement } from "@/models/Announcement";
+import { can, type Viewer } from "@/lib/access";
 import DeleteAnnouncementButton from "./DeleteAnnouncementButton";
 import EmptyState from "./EmptyState";
 import { formatDay } from "./AnnouncementDetails";
@@ -9,6 +10,7 @@ type Props = {
   highlightId?: number; // a just-posted announcement, shown with a notice
   // Server action that deletes the announcement with the given id.
   deleteAction: (id: number) => Promise<void>;
+  viewer: Viewer; // Edit and Delete show only for an admin (only looks: the guard checks)
 };
 
 // Newest first: by date, then by id for announcements posted at the same moment.
@@ -17,13 +19,16 @@ function newestFirst(a: Announcement, b: Announcement) {
 }
 
 // The announcements as cards: date badge, title, two lines of the message, "Read more".
-export default function AnnouncementList({ announcements, highlightId, deleteAction }: Props) {
+export default function AnnouncementList({ announcements, highlightId, deleteAction, viewer }: Props) {
+  const isEditor = can("form updateAnnouncement", viewer);
   if (announcements.length === 0) {
-    return (
+    return can("form createAnnouncement", viewer) ? (
       <EmptyState
         message="No announcements yet. Post the first one."
         action={{ href: "#new-announcement", label: "Post an announcement" }}
       />
+    ) : (
+      <EmptyState message="No announcements yet." />
     );
   }
 
@@ -59,15 +64,17 @@ export default function AnnouncementList({ announcements, highlightId, deleteAct
                     Read more<span className="visually-hidden">: {announcement.title}</span>
                     <span aria-hidden="true"> →</span>
                   </Link>
-                  <div className="button-row">
-                    <Link href={`${href}/edit`} className="button">
-                      Edit<span className="visually-hidden"> {announcement.title}</span>
-                    </Link>
-                    <DeleteAnnouncementButton
-                      action={deleteAction.bind(null, announcement.id)}
-                      title={announcement.title}
-                    />
-                  </div>
+                  {isEditor && (
+                    <div className="button-row">
+                      <Link href={`${href}/edit`} className="button">
+                        Edit<span className="visually-hidden"> {announcement.title}</span>
+                      </Link>
+                      <DeleteAnnouncementButton
+                        action={deleteAction.bind(null, announcement.id)}
+                        title={announcement.title}
+                      />
+                    </div>
+                  )}
                 </div>
               </article>
             </li>

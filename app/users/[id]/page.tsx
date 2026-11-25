@@ -2,10 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import * as AdminController from "@/controllers/AdminController";
 import * as UserDirectoryController from "@/controllers/UserDirectoryController";
 import UserDetails from "@/components/UserDetails";
 import JobPostingTable from "@/components/JobPostingTable";
 import DeleteUserButton from "@/components/DeleteUserButton";
+import { can } from "@/lib/access";
+import { guardPage, viewerOf } from "@/lib/guard";
 import { deleteUserAction } from "../actions";
 
 // The tab title: "<name> | Homecoming", or the 404 title if there is no such record.
@@ -18,7 +21,10 @@ export async function generateMetadata({ params }: PageProps<"/users/[id]">): Pr
 export default async function UserPage({ params, searchParams }: PageProps<"/users/[id]">) {
   await connection();
   const { id } = await params;
-  const { updated } = await searchParams;
+  // Access (lib/access.ts): logged in; Edit and Delete only for this user or an admin.
+  const viewer = viewerOf(await guardPage("page /users/[id]", `/users/${id}`));
+  const { updated, blocked } = await searchParams;
+  const blockedMessage = AdminController.BLOCKED[String(blocked) as AdminController.BlockedCode];
   const { ok, data: user } = await UserDirectoryController.profile(id);
   if (!ok || !user) notFound();
 
@@ -35,11 +41,22 @@ export default async function UserPage({ params, searchParams }: PageProps<"/use
             Changes saved.
           </p>
         )}
+        {blockedMessage && (
+          <p className="notice notice-blocked" role="alert">
+            {blockedMessage}
+          </p>
+        )}
         <UserDetails user={user} />
-        <div className="button-row">
-          <Link href={`/users/${user.id}/edit`} className="button primary">Edit</Link>
-          <DeleteUserButton action={deleteUserAction.bind(null, user.id)} name={user.fullName} />
-        </div>
+        {(can("page /users/[id]/edit", viewer, user.id) || can("form deleteUser", viewer, user.id)) && (
+          <div className="button-row">
+            {can("page /users/[id]/edit", viewer, user.id) && (
+              <Link href={`/users/${user.id}/edit`} className="button primary">Edit</Link>
+            )}
+            {can("form deleteUser", viewer, user.id) && (
+              <DeleteUserButton action={deleteUserAction.bind(null, user.id)} name={user.fullName} />
+            )}
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="jobs-title">

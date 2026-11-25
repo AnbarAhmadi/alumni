@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import * as AnnouncementController from "@/controllers/AnnouncementController";
 import AnnouncementForm from "@/components/AnnouncementForm";
+import { guardPage } from "@/lib/guard";
 import { updateAnnouncementAction } from "../../actions";
 
 // The tab title: "Edit announcement | Homecoming", or the 404 title if there is no such record.
@@ -16,6 +17,8 @@ export async function generateMetadata({ params }: PageProps<"/announcements/[id
 export default async function EditAnnouncementPage({ params }: PageProps<"/announcements/[id]/edit">) {
   await connection();
   const { id } = await params;
+  // Access (lib/access.ts): admin only.
+  await guardPage("page /announcements/[id]/edit", `/announcements/${id}/edit`);
   const { ok, data: announcement } = await AnnouncementController.show(id);
   if (!ok) notFound();
 

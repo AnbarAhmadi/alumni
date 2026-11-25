@@ -18,20 +18,46 @@ datasource db {
   provider = "postgresql"
 }
 
+// What a user may do on the site (ddd.md, Roles). Not the same as isAlumni,
+// which says whether the person graduated.
+enum Role {
+  ADMIN
+  ALUMNI
+  STUDENT
+}
+
 model User {
   id             Int     @id @default(autoincrement())
   fullName       String
   email          String  @unique
-  age            Int
+  // Optional since Week 10: the register page doesn't ask for it.
+  age            Int?
   school         String?
   isAlumni       Boolean @default(false)
   graduationYear Int?
+  role           Role    @default(STUDENT)
+  // A bcrypt hash, never the password. Never returned, logged or shown (ddd.md).
+  passwordHash   String
 
   // Relations only (no columns in users): see job_postings and applications below.
   jobPostings  JobPosting[]
   applications Application[]
+  sessions     Session[]
 
   @@map("users")
+}
+
+// One row per logged-in browser or client (ddd.md, Login and sessions). Only the SHA-256
+// hash of the session token is stored, never the token. Deleting the user deletes their sessions.
+model Session {
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
+  userId    Int
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
 }
 
 model Announcement {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { UserWithStatus } from "@/models/User";
+import { can, type Viewer } from "@/lib/access";
 import DeleteUserButton from "./DeleteUserButton";
 import EmptyState from "./EmptyState";
 
@@ -8,13 +9,19 @@ type Props = {
   highlightId?: number; // a just-created user, shown with a notice
   // Server action that deletes the user with the given id.
   deleteAction: (id: number) => Promise<void>;
+  viewer: Viewer; // who is looking: Edit and Delete show only on rows they may change
 };
 
 // The users as a table (DESIGN.md ref-2): name (a link to the profile), email, school,
-// alumni badge and graduation year, with Edit and Delete at the end of each row.
-export default function UserTable({ users, highlightId, deleteAction }: Props) {
+// alumni badge and graduation year, with Edit and Delete at the end of the rows the viewer
+// may change (their own row, or every row for an admin). Hiding is only looks: the guard checks.
+export default function UserTable({ users, highlightId, deleteAction, viewer }: Props) {
   if (users.length === 0) {
-    return <EmptyState message="No users yet. Add the first one." action={{ href: "#new-user", label: "Add a user" }} />;
+    return can("form createUser", viewer) ? (
+      <EmptyState message="No users yet. Add the first one." action={{ href: "#new-user", label: "Add a user" }} />
+    ) : (
+      <EmptyState message="No users yet." />
+    );
   }
 
   const created = users.find((u) => u.id === highlightId);
@@ -49,10 +56,14 @@ export default function UserTable({ users, highlightId, deleteAction }: Props) {
                 <td>{user.isAlumni ? <span className="badge">Alumni</span> : <span className="muted">—</span>}</td>
                 <td>{user.graduationYear ?? <span className="muted">—</span>}</td>
                 <td className="actions">
-                  <Link href={`/users/${user.id}/edit`} className="button">
-                    Edit<span className="visually-hidden"> {user.fullName}</span>
-                  </Link>
-                  <DeleteUserButton action={deleteAction.bind(null, user.id)} name={user.fullName} />
+                  {can("page /users/[id]/edit", viewer, user.id) && (
+                    <Link href={`/users/${user.id}/edit`} className="button">
+                      Edit<span className="visually-hidden"> {user.fullName}</span>
+                    </Link>
+                  )}
+                  {can("form deleteUser", viewer, user.id) && (
+                    <DeleteUserButton action={deleteAction.bind(null, user.id)} name={user.fullName} />
+                  )}
                 </td>
               </tr>
             ))}

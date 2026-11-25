@@ -43,3 +43,22 @@ export async function create(request: Request, id: string) {
     return handleError(err);
   }
 }
+
+// ---------- One posting, by its own id (Week 10, the admin panel; admin only) ----------
+
+// PATCH /api/jobs/[id] → 200 | 400 | 404 | 415. Only the fields sent change; userId may be
+// sent to give the posting another owner (it must be an existing user).
+export async function updateById(request: Request, id: string) {
+  try {
+    const posting = await JobPostingModel.update(toId(id), await parseBody(request));
+    return posting ? NextResponse.json(posting) : recordNotFound("Job posting", id);
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+// DELETE /api/jobs/[id] → 204 | 404. Its applications are deleted too (ON DELETE CASCADE).
+export async function removeById(id: string) {
+  if (!(await JobPostingModel.remove(toId(id)))) return recordNotFound("Job posting", id);
+  return new NextResponse(null, { status: 204 });
+}

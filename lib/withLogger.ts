@@ -14,6 +14,7 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { inspect } from "node:util";
+import { redactSecrets } from "./redact";
 
 const LOG_DIR = path.join(process.cwd(), "logs");
 const ERROR_LOG = path.join(LOG_DIR, "error.log");
@@ -35,7 +36,7 @@ function log(request: Request, status: number, start: number) {
 // method, route, message and stack trace. A failure here is only reported in
 // the terminal; it never reaches the client or stops the server.
 async function writeErrorLog(request: Request, err: unknown, details: string) {
-  const message = err instanceof Error ? err.message.trim() : String(err);
+  const message = redactSecrets(err instanceof Error ? err.message.trim() : String(err));
   const entry =
     `=== ${new Date().toISOString()} ${request.method} ${route(request)}\n` +
     `Message: ${message}\n` +
@@ -63,7 +64,8 @@ export function withLogger<R extends Request, A extends unknown[]>(
     } catch (err) {
       // One string with the stack, the error's own fields (code, meta) and its cause,
       // so the terminal, Next's dev log file (.next/dev/logs) and logs/error.log all show all of it.
-      const details = inspect(err, { depth: 5 });
+      // Password hashes are replaced with [redacted] (lib/redact.ts).
+      const details = redactSecrets(inspect(err, { depth: 5 }));
       console.error(`${time()} ${request.method} ${route(request)} unexpected error:\n${details}`);
       await writeErrorLog(request, err, details);
       response = internalServerError();
