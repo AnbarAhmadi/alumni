@@ -61,3 +61,9 @@ export async function destroySession(): Promise<void> {
   if (token) await SessionModel.removeByTokenHash(hashToken(token));
   cookieStore.set(SESSION_COOKIE, "", { ...cookieOptions, maxAge: 0 });
 }
+
+// After a password change (Week 10): logs the user out everywhere else, keeping this session.
+export async function endOtherSessions(userId: number): Promise<void> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (token) await SessionModel.removeOthers(userId, hashToken(token));
+}

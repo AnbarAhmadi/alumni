@@ -202,4 +202,12 @@ export const ApplicationModel = {
     const { count } = await prisma.application.deleteMany({ where: { id } });
     return count > 0;
   },
+
+  // Withdraw (Week 10, /me/applications): deletes the application only if it belongs to
+  // userId (the session user). False if there is no such application OR it is someone else's.
+  async removeOwn(id: number, userId: number): Promise<boolean> {
+    if (!isValidId(id) || !isValidId(userId)) return false;
+    const { count } = await prisma.application.deleteMany({ where: { id, userId } });
+    return count > 0;
+  },
 };

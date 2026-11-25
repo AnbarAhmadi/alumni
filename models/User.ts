@@ -514,4 +514,65 @@ export const UserModel = {
       return toAccount(await tx.user.update({ where: { id }, data: { role }, select: ACCOUNT_SELECT }));
     });
   },
+
+  // ---------- My profile (Week 10, /me) ----------
+  // Both work on the session user's id only (the caller passes it); no id comes from the request.
+
+  // Edits the user's own full name, school and graduation year (never email or role).
+  // school: an empty value clears it. graduationYear: required for a graduate (isAlumni),
+  // 1950 to the current year; not allowed for anyone else. Collects every broken rule
+  // (RegistrationError). Returns null if no user has this id.
+  async updateOwnProfile(id: number, input: UserInput): Promise<UserAccount | null> {
+    const current = await this.getAccount(id);
+    if (!current) return null;
+    const errors: FieldError[] = [];
+    const fail = (field: string, message: string) => errors.push({ field, message });
+    const text = (field: string) => (typeof input[field] === "string" ? (input[field] as string).trim() : "");
+
+    if (input.fullName === undefined || text("fullName") === "") fail("fullName", '"fullName" is required.');
+
+    const year = input.graduationYear;
+    const currentYear = new Date().getFullYear();
+    if (current.isAlumni) {
+      if (year === undefined) fail("graduationYear", '"graduationYear" is required for alumni.');
+      else if (typeof year !== "number" || !Number.isInteger(year) || year < FIRST_GRADUATION_YEAR || year > currentYear) {
+        fail("graduationYear", `"graduationYear" must be a year from ${FIRST_GRADUATION_YEAR} to ${currentYear}.`);
+      }
+    } else if (year !== undefined) {
+      fail("graduationYear", '"graduationYear" is not allowed for students.');
+    }
+    if (errors.length > 0) throw new RegistrationError(errors);
+
+    const data = {
+      fullName: text("fullName"),
+      school: text("school") || null,
+      ...(current.isAlumni && { graduationYear: year as number }),
+    };
+    const row = await write(() => prisma.user.update({ where: { id }, data, select: ACCOUNT_SELECT }));
+    return toAccount(row);
+  },
+
+  // Changes the user's own password: currentPassword must be right, newPassword at least
+  // 8 characters, confirmPassword the same. Only the new bcrypt hash is stored; the hash
+  // is never returned. Collects every broken rule (RegistrationError). False if no such user.
+  async changePassword(id: number, input: UserInput): Promise<boolean> {
+    if (!isValidId(id)) return false;
+    const row = await prisma.user.findUnique({ where: { id }, select: { passwordHash: true } });
+    if (!row) return false;
+    const errors: FieldError[] = [];
+    const fail = (field: string, message: string) => errors.push({ field, message });
+    const { currentPassword, newPassword, confirmPassword } = input;
+
+    if (typeof currentPassword !== "string" || currentPassword === "") fail("currentPassword", '"currentPassword" is required.');
+    else if (!(await bcrypt.compare(currentPassword, row.passwordHash))) fail("currentPassword", '"currentPassword" is wrong.');
+    if (typeof newPassword !== "string" || [...newPassword].length < MIN_PASSWORD_LENGTH) {
+      fail("newPassword", `"newPassword" must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    }
+    if (confirmPassword !== newPassword) fail("confirmPassword", '"confirmPassword" must match "newPassword".');
+    if (errors.length > 0) throw new RegistrationError(errors);
+
+    const passwordHash = await hashPassword(newPassword as string);
+    await write(() => prisma.user.update({ where: { id }, data: { passwordHash }, select: { id: true } }));
+    return true;
+  },
 };

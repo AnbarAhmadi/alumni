@@ -24,6 +24,9 @@ export const ACCESS_RULES = {
   "page /users": "loggedIn",
   "page /users/[id]": "loggedIn",
   "page /users/[id]/edit": "ownerOrAdmin", // owner: the user [id]
+  "page /jobs": "loggedIn", // Jobs (Week 10): every posting, with Apply
+  "page /me": "loggedIn", // My profile (Week 10): always the session user's own data
+  "page /me/applications": "loggedIn", // My applications: always the session user's own
   "page /announcements": "public",
   "page /announcements/[id]": "public",
   "page /announcements/[id]/edit": "admin",
@@ -38,6 +41,10 @@ export const ACCESS_RULES = {
   "form login": "public",
   "form logout": "public",
   "form register": "public",
+  "form applyToJob": "loggedIn", // /jobs: always as the session user, status "applied"
+  "form updateMyProfile": "loggedIn", // /me: the session user only, never an id from the request
+  "form changeMyPassword": "loggedIn",
+  "form withdrawApplication": "loggedIn", // /me/applications: deletes only the session user's own
   "form createUser": "admin",
   "form updateUser": "ownerOrAdmin", // owner: the user being edited
   "form deleteUser": "ownerOrAdmin", // owner: the user being deleted

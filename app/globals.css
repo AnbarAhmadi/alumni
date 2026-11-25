@@ -248,6 +248,15 @@ a:hover {
   outline-offset: 2px;
 }
 
+/* The logged-in user's name and role label (Week 10): text, not a link. */
+.site-nav-user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
 .site-footer {
   padding: var(--space-5) 0;
   background: var(--color-ink);
@@ -954,6 +963,15 @@ a:hover {
 .card-title a:hover,
 .card-title a:focus-visible {
   background-size: 100% 1px;
+}
+
+/* The current page's menu link (Week 10): the action colour, weight 600 and a 2px accent
+   bar under it, so it never depends on colour alone. */
+.site-nav a[aria-current="page"] {
+  color: var(--color-action);
+  font-weight: 600;
+  background-image: linear-gradient(var(--color-accent), var(--color-accent));
+  background-size: 100% 2px;
 }
 
 /* Cards that hold a link: the border turns the action colour on hover (instant with reduced motion). */

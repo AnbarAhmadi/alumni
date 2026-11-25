@@ -23,4 +23,9 @@ export const SessionModel = {
   async removeById(id: number): Promise<void> {
     await prisma.session.deleteMany({ where: { id } });
   },
+
+  // After a password change (Week 10): deletes every session of the user except this one.
+  async removeOthers(userId: number, keepTokenHash: string): Promise<void> {
+    await prisma.session.deleteMany({ where: { userId, NOT: { tokenHash: keepTokenHash } } });
+  },
 };

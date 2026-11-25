@@ -1,6 +1,6 @@
 # Brand kit
 
-The design rules for the Alumni Tracking System's new look (Week 9). The site doesn't use them yet. Screenshots of the current design, taken before the change, are in [docs/design/](docs/design/) (`before-users.png`, `before-user.png`).
+The brand of Homecoming (Week 9). Every page of the site uses it, through the rules in [DESIGN.md](DESIGN.md). Screenshots from before and after the change are in [docs/design/](docs/design/).
 
 Back to [README.md](README.md)
 

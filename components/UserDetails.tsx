@@ -9,14 +9,15 @@ function initials(fullName: string) {
 }
 
 // The profile header: initials avatar, the name in large serif, and the user's details.
-export default function UserDetails({ user }: { user: UserWithStatus }) {
+// roleLabel (Week 10, /me): shown as the badge instead of "Alumni".
+export default function UserDetails({ user, roleLabel }: { user: UserWithStatus; roleLabel?: string }) {
   return (
     <div className="profile">
       <div className="profile-head">
         <span className="avatar" aria-hidden="true">{initials(user.fullName)}</span>
         <div>
           <h1 id="profile-title">{user.fullName}</h1>
-          {user.isAlumni && <span className="badge">Alumni</span>}
+          {roleLabel ? <span className="badge">{roleLabel}</span> : user.isAlumni && <span className="badge">Alumni</span>}
         </div>
       </div>
       <dl className="facts">

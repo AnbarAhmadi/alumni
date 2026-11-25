@@ -306,7 +306,7 @@ The seed is for development only. The app shows these rows on `/users`, `/users/
 
 ## 👥 Roles
 
-Every user has exactly one `role` (Week 10). It is stored in `users.role` and is `STUDENT` when not given. The roles are stored; what each role may do is not enforced yet.
+Every user has exactly one `role` (Week 10). It is stored in `users.role` and is `STUDENT` when not given. What each role may do is enforced by the Access rules below.
 
 | Role | Who they are | What they may do |
 | --- | --- | --- |
@@ -352,12 +352,17 @@ Every page, form and API endpoint has exactly one rule. The rules follow the Rol
 | The "Add a user" form on `/users` | admin only | |
 | `/users/:id` (a profile) | logged in | |
 | `/users/:id/edit` and its form | owner or admin | the user `:id` |
+| `/me` (My profile) and its forms: edit your own full name, school and graduation year; change your password (Week 10) | logged in; **always the session user**: no id comes from the URL or the body, so it can't open anyone else's data. Email and role are not editable here | the session user |
+| `/jobs` (Jobs) and its Apply button (Week 10) | logged in; **applying always uses the session user**: the button sends only the posting, and the application is made with status `applied`; a second application to the same posting is refused | |
+| `/me/applications` (My applications) and its Withdraw button (Week 10) | logged in; **always the session user**: only your own applications are listed, and Withdraw deletes an application only if it is yours | the session user |
 | The Delete button of a user (on `/users` and `/users/:id`) | owner or admin | the user `:id` |
 | `/announcements`, `/announcements/:id` | public | |
 | The "Post an announcement" form, `/announcements/:id/edit` and its form, the Delete button of an announcement | admin only | |
 | `/admin` (the dashboard: users by role, the counts, links to the sections) | admin only | |
 | `/admin/users` and its forms: change a role, delete a user (editing uses `/users/:id/edit`) | admin only | |
-| `/admin/announcements`, `/admin/jobs`, `/admin/applications` (**Planned**, later parts) | admin only | |
+| `/admin/announcements` and its forms: post, delete (editing uses `/announcements/:id/edit`) | admin only | |
+| `/admin/jobs`, `/admin/jobs/:id/edit` and their forms: create a posting for a chosen owner, edit, delete | admin only | |
+| `/admin/applications` and its forms: change the status (`applied`, `reviewed`, `hired` or `rejected`; anything else is refused), delete | admin only | |
 
 **API:**
 
@@ -374,6 +379,8 @@ Every page, form and API endpoint has exactly one rule. The rules follow the Rol
 | `POST /api/users/:id/jobs` | admin only | |
 | `GET /api/users/:id/applications` | owner or admin | the user `:id` |
 | `POST /api/jobs/:id/applications` (apply) | logged in; **the applicant is always the session user and the status is always `applied`**: the body isn't read, so a `userId` or `status` in it is ignored | |
+| `PATCH /api/jobs/:id`, `DELETE /api/jobs/:id` (the admin panel) | admin only | |
+| `DELETE /api/applications/:id` (the admin panel) | admin only | |
 | `PATCH /api/applications/:id` (change the status) | owner or admin; only `status` changes. **Never the applicant** (unless they own the posting) | the user who owns the application's posting |
 | `GET /api/jobs/:id/applications` (the applicants) | owner or admin | the user who owns the posting (`job_postings.userId`) |
 | `GET /api/announcements`, `GET /api/announcements/:id` | public | |
@@ -397,7 +404,31 @@ Hiding a button the user may not use is only for looks; the guard is the real ch
 
 **Two details of Next.js:** a page whose cookie is there but no longer valid is redirected by `guardPage` with `307` (only `proxy.ts`, which runs before the page, can answer `303`). And a form sent **without JavaScript** that the guard refuses gets Next's 404 page instead of the 403 page (Next renders every `forbidden()` from a no-JavaScript form as "not found"); with JavaScript, the normal case, it is the 403 page. In both cases nothing is changed.
 
+**My pages (Week 10):** `/me` and `/me/applications` take the user only from the session (`guardPage` and `guardForm` return it), never from the URL or the form. The edit form changes only `fullName`, `school` (empty clears it) and `graduationYear` (graduates only, 1950 to the current year), in `UserModel.updateOwnProfile`. Change password (`UserModel.changePassword`) needs the current password, a new one of at least 8 characters and the same again; only the new bcrypt hash is stored, and then every **other** session of the user is deleted (`SessionModel.removeOthers`), so this browser stays logged in. Withdraw (`ApplicationModel.removeOwn`) deletes with `id` **and** `userId` = the session user, so someone else's application is never deleted. Errors are shown under their field; passwords are never sent back, shown or logged.
+
 **Links back after login:** `/login?next=<path>` returns to `<path>` after a successful login, but only if it is a relative path on this site (it starts with one `/`); anything else, such as `//evil.example` or `https://…`, goes to the home page.
+
+### Navigation (Week 10)
+
+The header's menu depends on who is looking. Every item is shown only if the Access rules above let that user open its page; hiding an item is only looks, and the guard stays the real check.
+
+| Menu item | Links to | Logged out | `STUDENT`, `ALUMNI` | `ADMIN` |
+| --- | --- | --- | --- | --- |
+| Home | `/` | Yes | Yes | Yes |
+| About | `/about` | Yes | Yes | Yes |
+| Announcements | `/announcements` | Yes | Yes | Yes |
+| Users | `/users` | No | Yes | Yes |
+| Jobs | `/jobs` | No | Yes | Yes |
+| My profile | `/me` | No | Yes | Yes |
+| My applications | `/me/applications` | No | Yes | Yes |
+| Admin | `/admin` | No | No | Yes |
+| Log in | `/login` | Yes | No (hidden when logged in) | No |
+| Register | `/register` | Yes | No (hidden when logged in) | No |
+| The user's name, a role label (Admin, Alumni, Student) and a Log out button | — (Log out is a POST form) | No | Yes | Yes |
+
+The link of the current page is marked with `aria-current="page"` (the action colour, weight 600 and a 2px accent bar).
+
+**Where it is built:** one list, `NAV_ITEMS` in `lib/navigation.ts` (label, link and the page's access key), and `navFor(viewer)`, which keeps an item only if `can()` from `lib/access.ts` allows its page. `components/SiteHeader.tsx` only shows what `navFor` returns; `components/NavLinks.tsx` marks the current link.
 
 ---
 
@@ -644,7 +675,7 @@ Nothing in this table is hidden or presented as done. "Current code" means the m
 | `users.role` (Week 10) | Enum `Role` (`ADMIN`, `ALUMNI`, `STUDENT`), required, default `STUDENT` | **Matches** in the database (migration `20261125065612_add_user_roles_and_passwords`; existing rows: user 1 `ADMIN`, else `ALUMNI` or `STUDENT` by `isAlumni`). Set by register and returned by `POST /api/register`; `/api/users` and the `/users` form give `STUDENT`. Changed by an admin on `/admin/users` or with `PATCH /api/users/:id/role`, and by `npm run make-admin` (Week 10); the seed makes no `ADMIN` any more. Not shown in `/api/users` |
 | `users.passwordHash` (Week 10) | `text`, required, a bcrypt hash; never in any API or page output | **Matches:** in the database; hashed with `bcryptjs` (cost 10) by `UserModel.register`; read only by `UserModel.authenticate` to compare it, and never returned or logged. Existing and seeded rows have the hash of the **demo-only** password `homecoming-demo`; users created by `/api/users` or the `/users` form get the hash of a random, unknown password |
 | Role permissions (Week 10) | `ADMIN` manages users, announcements and job postings; `ALUMNI` edits their own profile; everyone views the directory and applies (see the Roles section) | **Matches** (Week 10): the Access rules, from one map (`lib/access.ts`) and one guard (`lib/guard.ts`) used by every page, form and API endpoint, plus `proxy.ts` for the first check of pages. Applying always uses the session user |
-| Admin panel and safety rules (Week 10) | `/admin` and `/admin/users`, admin only; an admin can't delete themselves; the last admin can't be demoted or deleted | **Matches:** `app/admin/`, `controllers/AdminController.ts`, `PATCH /api/users/:id/role`; the safety rules are in `UserModel.remove` and `UserModel.changeRole` (one transaction that locks the admin rows), so they also hold for `DELETE /api/users/:id` and the Delete button on `/users`. `/admin/announcements`, `/admin/jobs` and `/admin/applications` are still to come. The "last admin can't be deleted" rule can only be reached by a script: through the site, the only admin who could delete the last admin is that admin, and the self-delete rule stops it first |
+| Admin panel and safety rules (Week 10) | `/admin` and `/admin/users`, admin only; an admin can't delete themselves; the last admin can't be demoted or deleted | **Matches:** `app/admin/`, `controllers/AdminController.ts`, `PATCH /api/users/:id/role`; the safety rules are in `UserModel.remove` and `UserModel.changeRole` (one transaction that locks the admin rows), so they also hold for `DELETE /api/users/:id` and the Delete button on `/users`. `/admin/announcements`, `/admin/jobs` and `/admin/applications` are built too (part 2). The "last admin can't be deleted" rule can only be reached by a script: through the site, the only admin who could delete the last admin is that admin, and the self-delete rule stops it first |
 | Register page and rules (Week 10) | Full name, email, password (8+), confirm password, role (`ALUMNI` or `STUDENT`), graduation year (`ALUMNI` only), optional school (see Register rules) | **Matches:** the `/register` page and `POST /api/register` both use `UserModel.register` (Week 10). The `/users` form and `/api/users` still create users with `fullName`, `email`, `age` and `school`, without a password of their own |
 
 ---

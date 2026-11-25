@@ -38,6 +38,10 @@ This project is being built incrementally over the semester. Status is updated w
 
 - [x] **Week 10:** Access rules: every page, form and API endpoint is public, logged in, owner or admin, or admin only, from one rules map (`lib/access.ts`) and one guard (`lib/guard.ts`: `withAuth` for the API, `guardPage` for pages, `guardForm` for server actions; `proxy.ts` sends visitors without a cookie to `/login?next=...` with `303`); a designed 403 page; `401`/`403` JSON for the API; applying always uses the session user; registering logs you in; buttons you may not use are hidden. See Access rules below and in [ddd.md](ddd.md)
 - [x] **Week 10:** Admin panel, part 1: `/admin` (a dashboard with users by role and the counts) and `/admin/users` (change a role, edit, delete), admin only, with an "Admin" link in the header for admins; `PATCH /api/users/:id/role`; safety rules in the model (an admin can't delete themselves, the last admin can't be demoted or deleted); `npm run make-admin -- <email>`, and the seed no longer creates an admin
+- [x] **Week 10:** Admin panel, part 2: `/admin/announcements` (create, edit, delete), `/admin/jobs` (every posting with its owner; create for a chosen owner, edit, delete) and `/admin/applications` (applicant, posting, status; change the status to applied, reviewed, hired or rejected, anything else is refused; delete), admin only, linked from the cards on `/admin`
+- [x] **Week 10:** Navigation by role: one menu list (`lib/navigation.ts`) built from the access rules, so the header shows only pages you may open (logged out: Home, About, Announcements, Log in, Register; logged in: also Users, My profile, your name with a role label and Log out; admins also Admin), with the current page marked (`aria-current="page"`). See Navigation in [ddd.md](ddd.md)
+- [x] **Week 10:** My pages: `/me` (My profile: your details with a role label, an edit form for full name, school and graduation year, and Change password, which logs out your other devices) and `/me/applications` (your applications with title, company, status and date, Withdraw, or "No applications yet."), always for the logged-in user only; the menu's "My profile" now links to `/me`, next to "My applications"
+- [x] **Week 10:** Jobs: `/jobs` (logged in, "Jobs" in the menu) lists every job posting, newest first, with title, company, city and who posted it, and an Apply button, or a disabled "Applied" once you applied; applying is always as the logged-in user with status `applied`, a second application to the same posting is refused, and "No postings yet." when there are none
 
 ### Upcoming
 
@@ -470,26 +474,71 @@ Error [PrismaClientKnownRequestError]: ...
 
 ---
 
-## 🔒 Access rules (Week 10)
+## Authentication and Authorization
 
-Every page, form and API endpoint has one rule, written once in `lib/access.ts` and explained in [ddd.md](ddd.md) (Access rules):
+### Overview
+
+Every user has one role, stored in `users.role`:
+
+| Role | Who | May do |
+| --- | --- | --- |
+| `ADMIN` | Department staff | Everything below, plus the admin panel: manage users and their roles, announcements, job postings and applications |
+| `ALUMNI` | Graduates | Use the directory (`/users`), browse and apply to jobs, edit their own profile and password, see and withdraw their own applications |
+| `STUDENT` | Current students | The same as `ALUMNI` (the two roles have the same rights today; `isAlumni` says whether someone graduated) |
+
+**Login says who you are; the access rules say what you may do.** Login turns an email and password into a session; every page, form and endpoint then checks one rule from `lib/access.ts` against that session's user.
+
+### Register and login
+
+| | Page | API |
+| --- | --- | --- |
+| Register | `/register` (Alumni or Student only; `ADMIN` can't be chosen). You are logged in straight away | `POST /api/register` |
+| Log in | `/login` (back to `?next=<path>` afterwards, relative paths only) | `POST /api/login` |
+| Log out | The "Log out" button in the header (a POST form) | `POST /api/logout` |
+| Who am I | The header shows your name and role | `GET /api/me` |
+
+- **Passwords:** only a bcrypt hash (`bcryptjs`, cost 10) is stored in `users.passwordHash`, never the password. The hash is never returned, shown or logged. An unknown email and a wrong password get the same answer: "Email or password is wrong."
+- **Sessions:** login makes a random token (32 bytes) and sends it in the `homecoming_session` cookie (`httpOnly`, `SameSite=Lax`, `Secure` in production). The `sessions` table keeps only the token's SHA-256 hash. A session lasts **7 days**. Logging out deletes its row and clears the cookie; an expired session is rejected and deleted. Changing your password on `/me` deletes your other sessions and keeps the current one.
+
+### Access rules
+
+Every page, form and API endpoint has exactly one rule, in **one rules map, `lib/access.ts`**. The full table, row by row, is in [ddd.md](ddd.md) (Access rules). In short:
 
 | Rule | Pages and forms | API |
 | --- | --- | --- |
 | **public** | `/`, `/about`, `/login`, `/register`, `/announcements`, `/announcements/:id`, the 404, 403 and 500 pages, Log out | `POST /api/login`, `/api/register`, `/api/logout`; `GET /api/announcements(/:id)`; Swagger; `/api/health`, `/hello`, `/sum` (no data) |
-| **logged in** | `/users`, `/users/:id` | `GET /api/me`, `/api/users`, `/api/users/:id`, `/api/users/:id/jobs`; `POST /api/jobs/:id/applications` (apply as yourself; the status is always `applied`) |
-| **owner or admin** | `/users/:id/edit` and its form; Delete a user | `PUT`/`PATCH`/`DELETE /api/users/:id`; `GET /api/users/:id/applications`; `GET /api/jobs/:id/applications` and `PATCH /api/applications/:id` (change the status) (the posting's owner, never the applicant) |
-| **admin only** | `/admin`, `/admin/users` and its forms (change a role, delete); "Add a user"; "Post an announcement", `/announcements/:id/edit` and Delete an announcement | `POST /api/users`, `PATCH /api/users/:id/role`, `POST /api/users/:id/jobs`, `POST /api/announcements`, `PUT`/`PATCH`/`DELETE /api/announcements/:id` |
+| **logged in** | `/users`, `/users/:id`, `/jobs` and Apply, `/me` and its forms, `/me/applications` and Withdraw (always your own data) | `GET /api/me`, `/api/users`, `/api/users/:id`, `/api/users/:id/jobs`; `POST /api/jobs/:id/applications` (as yourself, status `applied`) |
+| **owner or admin** | `/users/:id/edit` and its form; Delete a user | `PUT`/`PATCH`/`DELETE /api/users/:id`; `GET /api/users/:id/applications`; `GET /api/jobs/:id/applications` and `PATCH /api/applications/:id` (the posting's owner, never the applicant) |
+| **admin only** | `/admin` and its sections and forms; "Add a user"; "Post an announcement", `/announcements/:id/edit` and Delete an announcement | `POST /api/users`, `PATCH /api/users/:id/role`, `POST /api/users/:id/jobs`, `PATCH`/`DELETE /api/jobs/:id`, `DELETE /api/applications/:id`, `POST /api/announcements`, `PUT`/`PATCH`/`DELETE /api/announcements/:id` |
 
-**What happens otherwise.** Pages: not logged in → `303` to `/login?next=<path>` (after logging in you come back to `<path>`; only relative paths on this site are followed), wrong role or not the owner → the 403 page. API: `401` `{ "error": "Not logged in." }` or `403` `{ "error": "Forbidden", "reason": "Only an admin can do this." }`, both logged by `withLogger`.
+**What happens otherwise.** Pages: not logged in → `303` to `/login?next=<path>`; wrong role or not the owner → the 403 page. API: `401` `{ "error": "Not logged in." }` or `403` `{ "error": "Forbidden", "reason": "..." }`, both logged by `withLogger`.
 
-**How it is built.** `withAuth` wraps the API handlers like `withLogger` does; pages call `guardPage` and every server action calls `guardForm` itself, because an action can be called with a POST to any page; `proxy.ts` answers the cookie-less case early with a `303`. All of them ask the same `decide()` in `lib/access.ts`. This fits Next.js 16: proxy only sees the request (no database, no server-action target), so the real check sits in each route, page and action. Buttons you may not use are hidden with `can()` from the same map; that is only looks, the guard is the real check.
+**How it is built.** `withAuth` wraps the API handlers, pages call `guardPage`, and every server action calls `guardForm` itself (an action can be posted to any page). `proxy.ts` sends visitors without a cookie to `/login` early. All of them ask the same `decide()` in `lib/access.ts`.
 
-**Try it** with the seeded users (demo-only password `homecoming-demo`; they are `ALUMNI` or `STUDENT`) and an admin you make yourself with `npm run make-admin` (see Getting Started, step 6).
+### Navigation, user pages and admin panel
+
+- **Navigation by role:** the header's menu comes from one list, `lib/navigation.ts`, and shows an item only if `can()` from `lib/access.ts` allows its page. Logged out: Home, About, Announcements, Log in, Register. `STUDENT` and `ALUMNI`: Home, About, Announcements, Users, Jobs, My profile, My applications, and your name with a role label and Log out. `ADMIN`: the same plus Admin. The current page is marked with `aria-current="page"`.
+- **Your pages** (always the session user, never an id from the URL or a form): `/me` shows your details, an edit form for full name, school and graduation year (not email or role), and Change password. `/me/applications` lists your applications with Withdraw. `/jobs` lists every posting with Apply, or "Applied" once you applied (a second application is refused).
+- **Admin panel** (admin only, "Admin" in the menu): `/admin` (users by role and the counts), `/admin/users` (change a role, edit, delete), `/admin/announcements` (post, edit, delete), `/admin/jobs` (create for a chosen owner, edit, delete) and `/admin/applications` (change the status to applied, reviewed, hired or rejected, or delete). Safety rules in the model: an admin can't delete their own account, and the last admin can't be demoted or deleted.
+
+### Try it
+
+1. **As a seeded user:** the seed's users are `ALUMNI` or `STUDENT`, and all share the **demo-only** password `homecoming-demo` (development only, never for a real account or a hosted database). `/users` and `/api/users` need a login, so take a first email from the database: `docker compose exec db psql -U alumni -d alumni -c "SELECT email, role FROM users ORDER BY id LIMIT 5;"`. Log in on `/login`; after that, `/users` and `GET /api/users` list everyone else's email.
+2. **As an admin:** the seed makes no admin. Register your own account on `/register`, then run `npm run make-admin -- <your email>` and reload: the header shows **Admin**. More admins can be made on `/admin/users`.
+3. **Resetting:** running the seed again (`npx prisma db seed`) deletes every account and session, your own admin too, so register and run `make-admin` again afterwards.
+
+### Security notes and limitations
+
+- **No rate limiting:** login attempts are not limited, so passwords can be guessed without a slowdown.
+- **No CSRF tokens:** forms and the API rely on the `SameSite=Lax` session cookie (and the Origin check Next.js does for server actions); there is no separate CSRF token.
+- **No email verification and no password reset:** anyone can register with any email address, and a forgotten password can't be reset.
+- **Hiding is only looks:** a menu item or button you may not use is hidden, but the guard on the page, form or endpoint is the real check.
 
 ---
 
 ## Design
+
+How login and access work: see [Authentication and Authorization](#authentication-and-authorization).
 
 The [Brand kit](BRAND.md) sets the look of **Homecoming** (Week 9): the name and promise, the colours, fonts, shapes, voice, wordmark and motion. The [Design rules](DESIGN.md) say how the pages use it: three references (layout, table, empty state), the CSS variables for `:root`, and the rules for the layout, the stylesheet and the components (one card, one button hover, one standalone link, one table, one form width, one empty state). Motion is subtle: the page content fades in, cards and table rows enter one after another, cards lift 2px on hover, link underlines slide in, buttons change colour and shrink slightly when pressed, and the homepage numbers count up once; people with `prefers-reduced-motion: reduce` get no movement. In the website forms, errors are shown in plain words ("Full name is required."); the JSON API keeps its own messages.
 
@@ -727,7 +776,7 @@ docker compose ps db
 npx prisma migrate deploy
 ```
 
-**4. Run the seed.** First generate the Prisma Client (it is git-ignored, so a fresh clone doesn't have it). Then fill the tables with fake development data: the seed empties all five tables (so everyone is logged out) and inserts 20 fake users (user 1 is `ADMIN`, the others `ALUMNI` or `STUDENT`; all with the **demo-only** password `homecoming-demo`, never for real accounts), 5 fake announcements, 2 or 3 job postings for each of the first 10 users (25 in total), and 30 applications between random users and postings (never the same pair twice), made with Faker using a fixed seed, so every run gives the same rows. Running it again never adds duplicates. It refuses to run when `NODE_ENV` is `production`. **The seed is for development only:** it deletes everything and inserts fake people with the demo-only password, and it creates **no admin** (see step 6). See [ddd.md](ddd.md).
+**4. Run the seed.** First generate the Prisma Client (it is git-ignored, so a fresh clone doesn't have it). Then fill the tables with fake development data: the seed empties all five tables (so everyone is logged out) and inserts 20 fake users (`ALUMNI` or `STUDENT`, no `ADMIN`; all with the **demo-only** password `homecoming-demo`, never for real accounts), 5 fake announcements, 2 or 3 job postings for each of the first 10 users (25 in total), and 30 applications between random users and postings (never the same pair twice), made with Faker using a fixed seed, so every run gives the same rows. Running it again never adds duplicates. It refuses to run when `NODE_ENV` is `production`. **The seed is for development only:** it deletes everything and inserts fake people with the demo-only password, and it creates **no admin** (see step 6). See [ddd.md](ddd.md).
 
 ```bash
 npx prisma generate
